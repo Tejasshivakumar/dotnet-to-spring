@@ -11,13 +11,27 @@ import java.util.stream.Stream;
  *
  * <p>This is the boundary between parsing and everything downstream. Generation reads only from
  * here, never from C# text.
+ *
+ * @param entryPointSource raw text of Program.cs or Startup.cs, kept because top-level statements
+ *     are outside the grammar and DI registrations are read from it by regex instead
  */
 public record SourceProject(
     String name,
     String targetFramework,
     List<PackageRef> packages,
     List<SourceFile> files,
-    Map<String, Object> appSettings) {
+    Map<String, Object> appSettings,
+    String entryPointSource) {
+
+  /** Without an entry point. */
+  public SourceProject(
+      String name,
+      String targetFramework,
+      List<PackageRef> packages,
+      List<SourceFile> files,
+      Map<String, Object> appSettings) {
+    this(name, targetFramework, packages, files, appSettings, null);
+  }
 
   public SourceProject {
     packages = List.copyOf(packages == null ? List.of() : packages);

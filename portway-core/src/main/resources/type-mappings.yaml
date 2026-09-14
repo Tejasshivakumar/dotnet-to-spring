@@ -1,0 +1,70 @@
+# C# to Java type mappings.
+#
+# Data rather than Java so the table can be read, diffed and extended without a
+# recompile, and so the same text can be handed to the LLM system prompt without
+# ever drifting from what the rule engine actually does.
+#
+# finding: raised whenever the mapping is used, because the translation is lossy.
+
+# Types with a direct Java counterpart. `boxed` is used when the C# side is
+# nullable (int?) or when the type appears as a generic argument.
+scalars:
+  int:            { java: int,     boxed: java.lang.Integer }
+  uint:           { java: long,    boxed: java.lang.Long, finding: UNSIGNED_BYTE }
+  long:           { java: long,    boxed: java.lang.Long }
+  ulong:          { java: long,    boxed: java.lang.Long, finding: UNSIGNED_BYTE }
+  short:          { java: short,   boxed: java.lang.Short }
+  ushort:         { java: int,     boxed: java.lang.Integer, finding: UNSIGNED_BYTE }
+  # C# byte is unsigned 0..255, Java's is signed -128..127. Values above 127 wrap.
+  byte:           { java: byte,    boxed: java.lang.Byte, finding: UNSIGNED_BYTE }
+  sbyte:          { java: byte,    boxed: java.lang.Byte }
+  bool:           { java: boolean, boxed: java.lang.Boolean }
+  char:           { java: char,    boxed: java.lang.Character }
+  double:         { java: double,  boxed: java.lang.Double }
+  float:          { java: float,   boxed: java.lang.Float }
+  # Never double. This is money, and binary floating point cannot represent it.
+  decimal:        { java: java.math.BigDecimal }
+  string:         { java: java.lang.String }
+  object:         { java: java.lang.Object }
+  dynamic:        { java: java.lang.Object, finding: UNSUPPORTED_CONSTRUCT }
+  void:           { java: void }
+  DateTime:       { java: java.time.LocalDateTime }
+  DateTimeOffset: { java: java.time.OffsetDateTime }
+  DateOnly:       { java: java.time.LocalDate }
+  TimeOnly:       { java: java.time.LocalTime }
+  TimeSpan:       { java: java.time.Duration }
+  Guid:           { java: java.util.UUID }
+
+# Generic containers. Type arguments are mapped recursively and always boxed.
+generics:
+  List:           java.util.List
+  IList:          java.util.List
+  IEnumerable:    java.util.List
+  IReadOnlyList:  java.util.List
+  IReadOnlyCollection: java.util.Collection
+  ICollection:    java.util.Collection
+  HashSet:        java.util.Set
+  ISet:           java.util.Set
+  IReadOnlySet:   java.util.Set
+  Dictionary:     java.util.Map
+  IDictionary:    java.util.Map
+  IReadOnlyDictionary: java.util.Map
+  Queue:          java.util.Deque
+  Stack:          java.util.Deque
+  Nullable:       BOXED_ARGUMENT
+
+# Wrappers that vanish, leaving their single type argument behind.
+#
+# This is the lossiest rule in the table. Task<T> becomes T, await is dropped,
+# and the result is synchronous code that used to be asynchronous. That is a
+# real semantic change, so every use raises a finding rather than pretending
+# the two are equivalent.
+unwrap:
+  Task:      { empty: void, finding: ASYNC_DROPPED }
+  ValueTask: { empty: void, finding: ASYNC_DROPPED }
+
+# ASP.NET Core action results become Spring's ResponseEntity.
+responses:
+  IActionResult:  { java: org.springframework.http.ResponseEntity, wildcard: true }
+  ActionResult:   { java: org.springframework.http.ResponseEntity }
+  ActionResult`1: { java: org.springframework.http.ResponseEntity }

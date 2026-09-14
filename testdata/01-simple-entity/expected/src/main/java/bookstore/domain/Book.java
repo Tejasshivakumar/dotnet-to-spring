@@ -1,4 +1,4 @@
-package com.bookstore.models;
+package bookstore.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -14,7 +14,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "books")
 public class Book {
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;

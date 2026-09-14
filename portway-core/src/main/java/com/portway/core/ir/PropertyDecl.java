@@ -24,6 +24,15 @@ public record PropertyDecl(
     attributes = List.copyOf(attributes == null ? List.of() : attributes);
   }
 
+  public boolean hasAttribute(String attributeName) {
+    return attributes.stream().anyMatch(a -> a.name().equals(attributeName));
+  }
+
+  /** A property with an expression body and no setter is computed, not stored. */
+  public boolean isComputed() {
+    return !hasSetter && initializer != null;
+  }
+
   public static PropertyDecl auto(String name, TypeRef type) {
     return new PropertyDecl(name, type, List.of("public"), List.of(), true, true, null, null);
   }
