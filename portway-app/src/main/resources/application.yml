@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: portway
+  datasource:
+    url: ${PORTWAY_DB_URL:jdbc:postgresql://localhost:5432/portway}
+    username: ${PORTWAY_DB_USER:portway}
+    password: ${PORTWAY_DB_PASSWORD:portway}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+server:
+  port: 8080
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    root: INFO
+    com.portway: DEBUG

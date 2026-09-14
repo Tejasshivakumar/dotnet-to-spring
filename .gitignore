@@ -27,3 +27,7 @@ obj/
 # Pipeline working output
 /out/
 /work/
+
+# .NET build output from the sample fixture
+sample-dotnet/**/bin/
+sample-dotnet/**/obj/

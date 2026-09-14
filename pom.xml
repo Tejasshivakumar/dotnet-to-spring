@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.portway</groupId>
+  <artifactId>portway-parent</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>Portway</name>
+  <description>.NET to Spring Boot migration assistant</description>
+
+  <modules>
+    <module>portway-core</module>
+    <module>portway-app</module>
+  </modules>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <spring-boot.version>3.5.3</spring-boot.version>
+    <testcontainers.version>1.21.3</testcontainers.version>
+    <antlr.version>4.13.2</antlr.version>
+    <javapoet.version>0.7.0</javapoet.version>
+    <google-java-format.version>1.27.0</google-java-format.version>
+    <springdoc.version>2.8.6</springdoc.version>
+    <json-schema-validator.version>1.5.6</json-schema-validator.version>
+    <jacoco.version>0.8.13</jacoco.version>
+  </properties>
+
+  <!--
+    Spring Boot is imported as a BOM rather than inherited as a parent POM.
+    Inheriting spring-boot-starter-parent would apply Spring's plugin config to
+    portway-core, which is deliberately a plain Java library (see README).
+    A BOM import gives us version alignment without pulling Spring into core.
+  -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers-bom</artifactId>
+        <version>${testcontainers.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.portway</groupId>
+        <artifactId>portway-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <plugins>
+      <!--
+        The build compiles and tests on JDK 21 even when the developer's JAVA_HOME
+        points elsewhere. Requires a jdk toolchain for version 21 in
+        ~/.m2/toolchains.xml; GitHub Actions' setup-java writes one automatically.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-toolchains-plugin</artifactId>
+        <version>3.2.0</version>
+        <executions>
+          <execution>
+            <goals><goal>select-jdk-toolchain</goal></goals>
+            <configuration>
+              <version>21</version>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+          <version>${spring-boot.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.antlr</groupId>
+          <artifactId>antlr4-maven-plugin</artifactId>
+          <version>${antlr.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>3.5.2</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+</project>
