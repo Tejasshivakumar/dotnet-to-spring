@@ -37,11 +37,12 @@ public class CSharpSourceParser {
     lexer.removeErrorListeners();
     lexer.addErrorListener(listener);
 
-    CSharpParser parser = new CSharpParser(new CommonTokenStream(lexer));
+    CommonTokenStream tokens = new CommonTokenStream(lexer);
+    CSharpParser parser = new CSharpParser(tokens);
     parser.removeErrorListeners();
     parser.addErrorListener(listener);
 
     CSharpParser.Compilation_unitContext tree = parser.compilation_unit();
-    return new ParseResult(path, tree, listener.errors());
+    return new ParseResult(path, tree, tokens, listener.errors());
   }
 }
