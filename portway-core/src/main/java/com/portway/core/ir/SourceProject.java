@@ -1,5 +1,7 @@
 package com.portway.core.ir;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -20,7 +22,12 @@ public record SourceProject(
   public SourceProject {
     packages = List.copyOf(packages == null ? List.of() : packages);
     files = List.copyOf(files == null ? List.of() : files);
-    appSettings = Map.copyOf(appSettings == null ? Map.of() : appSettings);
+    // Not Map.copyOf: appsettings.json legitimately contains null values, which
+    // Map.copyOf rejects with an NPE, and key order is worth keeping for the
+    // application.yml it turns into.
+    appSettings =
+        Collections.unmodifiableMap(
+            new LinkedHashMap<>(appSettings == null ? Map.of() : appSettings));
   }
 
   /** Every type in every file, flattened. */

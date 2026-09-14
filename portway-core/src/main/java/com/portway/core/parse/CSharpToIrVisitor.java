@@ -484,8 +484,9 @@ public class CSharpToIrVisitor {
   }
 
   /**
-   * Index of an assignment {@code =} that is not part of {@code ==}, {@code >=}, {@code <=} or
-   * {@code !=}, and is outside quotes, brackets and parentheses. Returns -1 when there is none.
+   * Index of an assignment {@code =} that is not part of {@code ==}, {@code >=}, {@code <=}, {@code
+   * !=} or a lambda {@code =>}, and is outside quotes, brackets and parentheses. Returns -1 when
+   * there is none.
    */
   private static int topLevelAssignment(String text) {
     int depth = 0;
@@ -502,7 +503,10 @@ public class CSharpToIrVisitor {
         } else if (c == '=' && depth == 0) {
           char prev = i > 0 ? text.charAt(i - 1) : ' ';
           char next = i + 1 < text.length() ? text.charAt(i + 1) : ' ';
-          if (next != '=' && prev != '=' && prev != '!' && prev != '<' && prev != '>') {
+          boolean partOfComparison =
+              next == '=' || prev == '=' || prev == '!' || prev == '<' || prev == '>';
+          boolean lambdaArrow = next == '>';
+          if (!partOfComparison && !lambdaArrow) {
             return i;
           }
         }

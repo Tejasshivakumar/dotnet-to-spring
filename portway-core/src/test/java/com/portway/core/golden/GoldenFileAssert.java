@@ -73,6 +73,14 @@ public final class GoldenFileAssert {
 
   private static void rewrite(Map<String, String> actual, GoldenCase goldenCase) {
     Path root = goldenCase.expected();
+    // A migrator that returned nothing is a bug, not a new expectation. Without
+    // this guard one broken run plus -Dupdate.golden=true silently deletes every
+    // expectation in the case and the suite goes green on an empty contract.
+    if (actual.isEmpty()) {
+      fail(
+          "Refusing to rewrite golden files for %s: the migrator produced no output."
+              .formatted(goldenCase.name()));
+    }
     try {
       if (Files.isDirectory(root)) {
         try (var walk = Files.walk(root)) {

@@ -1,5 +1,7 @@
 package com.portway.core.ir;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -17,7 +19,10 @@ public record AttributeUse(
 
   public AttributeUse {
     positionalArgs = List.copyOf(positionalArgs == null ? List.of() : positionalArgs);
-    namedArgs = Map.copyOf(namedArgs == null ? Map.of() : namedArgs);
+    // Ordered, because these become annotation arguments and golden-file tests
+    // compare generated text exactly.
+    namedArgs =
+        Collections.unmodifiableMap(new LinkedHashMap<>(namedArgs == null ? Map.of() : namedArgs));
   }
 
   public static AttributeUse of(String name, String... positionalArgs) {
