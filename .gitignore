@@ -1,0 +1,29 @@
+# Java / Maven
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+# ANTLR generated sources
+generated-sources/
+# Node
+node_modules/
+web/dist/
+npm-debug.log*
+# .NET
+bin/
+obj/
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+# OS
+.DS_Store
+# Local env / secrets
+.env
+.env.local
+# Pipeline working output
+/out/
+/work/
