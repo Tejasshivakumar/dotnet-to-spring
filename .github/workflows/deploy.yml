@@ -1,0 +1,56 @@
+name: Deploy to Azure Container Apps
+
+# Rolls out a released version: push a tag such as v1.0.0; once the Docker
+# image workflow has published it, this deploys the same tag.
+#
+# The container app itself, with its database secrets and environment, is
+# created once by hand (README, "Deploying"). This workflow only moves it to a
+# new image, so no database password ever passes through CI.
+#
+# Needs: repository secrets AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+# (a federated credential for this repository, no stored Azure password), and
+# repository variables AZURE_RESOURCE_GROUP and AZURE_CONTAINERAPP_NAME.
+on:
+  workflow_run:
+    workflows: ['Docker image']
+    types: [completed]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      startsWith(github.event.workflow_run.head_branch, 'v')
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Version from tag
+        id: version
+        run: echo "tag=${HEAD_BRANCH#v}" >> "$GITHUB_OUTPUT"
+        env:
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+
+      - uses: azure/container-apps-deploy-action@v2
+        with:
+          resourceGroup: ${{ vars.AZURE_RESOURCE_GROUP }}
+          containerAppName: ${{ vars.AZURE_CONTAINERAPP_NAME }}
+          imageToDeploy: ghcr.io/${{ github.repository_owner }}/portway:${{ steps.version.outputs.tag }}
+
+      - name: Smoke test
+        run: |
+          url=$(az containerapp show -g "${{ vars.AZURE_RESOURCE_GROUP }}" -n "${{ vars.AZURE_CONTAINERAPP_NAME }}" \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          for i in $(seq 1 30); do
+            curl -fsS "https://$url/actuator/health" | grep -q UP && exit 0
+            sleep 10
+          done
+          echo "Deployed app never reported healthy" && exit 1

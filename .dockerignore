@@ -1,0 +1,9 @@
+**/target
+**/node_modules
+web/dist
+.git
+.github
+.vscode
+**/bin
+**/obj
+**/*.log

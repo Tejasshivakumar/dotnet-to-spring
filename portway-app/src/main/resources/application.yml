@@ -52,6 +52,16 @@ portway:
     max-retries: 3
     job-token-budget: ${PORTWAY_AI_TOKEN_BUDGET:400000}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
