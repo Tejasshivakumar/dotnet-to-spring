@@ -66,6 +66,16 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-testcontainers</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
@@ -79,6 +89,38 @@
 
   <build>
     <plugins>
+      <!--
+        The sample .NET project, bundled so "Use sample project" works from the
+        deployed jar with nothing to upload. Sources only: no bin/ or obj/.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>bundle-sample</id>
+            <phase>generate-resources</phase>
+            <goals><goal>copy-resources</goal></goals>
+            <configuration>
+              <outputDirectory>${project.build.outputDirectory}/sample/BookstoreApi</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/../sample-dotnet/BookstoreApi</directory>
+                  <includes>
+                    <include>**/*.cs</include>
+                    <include>**/*.csproj</include>
+                    <include>appsettings*.json</include>
+                  </includes>
+                  <excludes>
+                    <exclude>bin/**</exclude>
+                    <exclude>obj/**</exclude>
+                  </excludes>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <!--
         The APIs generated code may import, copied into the jar as plain resources
         under verify-lib/ for the in-process compile verifier. Deliberately NOT on

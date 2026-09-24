@@ -1,0 +1,5 @@
+# Azure Container Apps gives no Docker socket, so the cloud deployment verifies
+# with the in-process compiler and says so in the UI.
+portway:
+  verify:
+    mode: in-process

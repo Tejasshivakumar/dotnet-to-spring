@@ -15,15 +15,44 @@ spring:
     multipart:
       max-file-size: 20MB
       max-request-size: 20MB
+  mvc:
+    problemdetails:
+      enabled: true
+  threads:
+    virtual:
+      enabled: false
 
 server:
-  port: 8080
+  port: ${PORT:8080}
+
+portway:
+  work-dir: ${PORTWAY_WORK_DIR:${java.io.tmpdir}/portway}
+  upload:
+    max-entries: 2000
+    max-total-bytes: 104857600    # 100 MB uncompressed: a zip bomb stops here
+    max-entry-bytes: 5242880      # 5 MB for any single file
+  pipeline:
+    core-threads: 2
+    max-threads: 4
+    queue-capacity: 10
+  verify:
+    # in-process: javac against a fixed classpath, no Docker needed (the cloud path)
+    # docker: a real, network-isolated Maven build via Testcontainers
+    mode: ${PORTWAY_VERIFY_MODE:in-process}
+    docker:
+      cache-dir: ${user.home}/.portway/m2
+      timeout: 180s
+      memory-bytes: 1073741824
+  ai:
+    enabled: ${PORTWAY_AI_ENABLED:false}
 
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
 
 logging:
   level:
     root: INFO
-    com.portway: DEBUG
+    com.portway: INFO

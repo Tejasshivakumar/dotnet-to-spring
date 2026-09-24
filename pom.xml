@@ -18,6 +18,9 @@
 
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
+    <!-- Spring binds @RequestParam and @PathVariable by parameter name. The Boot
+         parent POM turns this on; importing the BOM instead means doing it here. -->
+    <maven.compiler.parameters>true</maven.compiler.parameters>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 

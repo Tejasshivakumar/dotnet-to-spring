@@ -93,14 +93,59 @@ public final class VerifiedMigration {
     this.maxRounds = maxRounds;
   }
 
+  /** AI fill, then verify and repair, in one call. */
   public Outcome run(MigrationSession session, Path workDir, Listener listener) {
-    MigrationResult result = session.result() != null ? session.result() : session.generate();
-    Map<String, String> aiBodies = new LinkedHashMap<>();
-    Set<String> repaired = new HashSet<>();
+    Run run = start(session);
+    run.aiFill(listener);
+    return run.verify(workDir, listener);
+  }
 
-    if (translator != null) {
-      result = aiFill(session, result, aiBodies, listener);
+  /**
+   * Starts a run whose steps the caller drives, so a pipeline can report AI fill and verification
+   * as separate stages. The run remembers which bodies the translator wrote and which have already
+   * had their one repair.
+   */
+  public Run start(MigrationSession session) {
+    return new Run(session);
+  }
+
+  /** One migration's pass through the loop. */
+  public final class Run {
+    private final MigrationSession session;
+    private final Map<String, String> aiBodies = new LinkedHashMap<>();
+    private final Set<String> repaired = new HashSet<>();
+
+    private Run(MigrationSession session) {
+      this.session = session;
+      if (session.result() == null) {
+        session.generate();
+      }
     }
+
+    /** Sends every tier B method to the translator, if there is one. Returns how many it filled. */
+    public int aiFill(Listener listener) {
+      if (translator == null) {
+        listener.aiFill(0);
+        return 0;
+      }
+      int before = aiBodies.size();
+      VerifiedMigration.this.aiFill(session, session.result(), aiBodies, listener);
+      return aiBodies.size() - before;
+    }
+
+    /** Compiles, repairs, and recompiles, until clean or stuck. */
+    public Outcome verify(Path workDir, Listener listener) {
+      return VerifiedMigration.this.verify(session, workDir, listener, aiBodies, repaired);
+    }
+  }
+
+  private Outcome verify(
+      MigrationSession session,
+      Path workDir,
+      Listener listener,
+      Map<String, String> aiBodies,
+      Set<String> repaired) {
+    MigrationResult result = session.result();
     if (verifier == null) {
       return new Outcome(result, null, statuses(result, null), 0, result.findings());
     }
