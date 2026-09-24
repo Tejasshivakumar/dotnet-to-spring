@@ -119,6 +119,9 @@ public final class PortwayCli {
     MigrationResult result = outcome.result();
     ProjectWriter.write(result.files(), a.out);
     summarise(outcome, a.out);
+    if (translator instanceof com.portway.app.ai.LlmBodyTranslator llm) {
+      out.println("AI usage:          " + llm.usage().toStats());
+    }
     return verifier == null || outcome.compiles() ? 0 : 2;
   }
 

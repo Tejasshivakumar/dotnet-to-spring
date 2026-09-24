@@ -26,6 +26,7 @@ public final class JobContext {
   private MigrationSession session;
   private VerifiedMigration.Run run;
   private VerifiedMigration.Outcome outcome;
+  private com.portway.app.ai.LlmBodyTranslator translator;
 
   public JobContext(
       UUID jobId,
@@ -90,6 +91,15 @@ public final class JobContext {
 
   public void outcome(VerifiedMigration.Outcome outcome) {
     this.outcome = outcome;
+  }
+
+  /** The job's AI translator, or null when AI is off. Its usage goes into the report. */
+  public com.portway.app.ai.LlmBodyTranslator translator() {
+    return translator;
+  }
+
+  public void translator(com.portway.app.ai.LlmBodyTranslator translator) {
+    this.translator = translator;
   }
 
   /** Lets a long stage report that it has moved into a sub-stage, such as VERIFY into REPAIR. */

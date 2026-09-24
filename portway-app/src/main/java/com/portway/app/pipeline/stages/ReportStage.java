@@ -148,6 +148,9 @@ public class ReportStage implements PipelineStage {
     Map<String, Object> stats = new LinkedHashMap<>(context.stats());
     stats.putAll(summary(outcome));
     stats.put("stageMillis", stageMillis(jobId));
+    if (context.translator() != null) {
+      stats.put("ai", context.translator().usage().toStats());
+    }
     job.setStats(stats);
     if (outcome.compile() != null) {
       job.setVerifier(outcome.compile().verifier());

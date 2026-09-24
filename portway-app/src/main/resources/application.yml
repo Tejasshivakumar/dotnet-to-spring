@@ -44,7 +44,13 @@ portway:
       timeout: 180s
       memory-bytes: 1073741824
   ai:
+    # Needs ANTHROPIC_API_KEY in the environment. Never put the key in this file.
     enabled: ${PORTWAY_AI_ENABLED:false}
+    model: ${PORTWAY_AI_MODEL:claude-opus-5}
+    effort: ${PORTWAY_AI_EFFORT:high}
+    max-concurrent: 3
+    max-retries: 3
+    job-token-budget: ${PORTWAY_AI_TOKEN_BUDGET:400000}
 
 springdoc:
   swagger-ui:

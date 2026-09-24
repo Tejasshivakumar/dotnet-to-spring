@@ -12,7 +12,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "portway")
 public record PortwayProperties(
-    Path workDir, Upload upload, Pipeline pipeline, Verify verify, Ai ai) {
+    Path workDir, Upload upload, Pipeline pipeline, Verify verify) {
 
   /** Limits on an uploaded zip. The zip is untrusted input. */
   public record Upload(
@@ -30,6 +30,4 @@ public record PortwayProperties(
 
     public record Docker(Path cacheDir, @DefaultValue("180s") Duration timeout, @DefaultValue("1073741824") long memoryBytes) {}
   }
-
-  public record Ai(@DefaultValue("false") boolean enabled) {}
 }

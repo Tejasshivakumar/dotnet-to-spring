@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Method body translation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["javaBody", "requiredImports", "notes", "confidence"],
+  "properties": {
+    "javaBody": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The Java statements of the method body only: no signature, no enclosing braces, no markdown."
+    },
+    "requiredImports": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*(\\.[a-zA-Z_][a-zA-Z0-9_]*)+$"
+      },
+      "description": "Fully qualified names of every type the body uses by simple name that is not already imported."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Anything the reviewer should check: behaviour that changed, assumptions made."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "How confident the translation preserves the C# behaviour, 0 to 1."
+    }
+  }
+}

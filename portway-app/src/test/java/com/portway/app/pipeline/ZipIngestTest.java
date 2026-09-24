@@ -18,7 +18,7 @@ import org.junit.jupiter.api.io.TempDir;
 class ZipIngestTest {
 
   private static final PortwayProperties LIMITS =
-      new PortwayProperties(null, new PortwayProperties.Upload(10, 1000, 400), null, null, null);
+      new PortwayProperties(null, new PortwayProperties.Upload(10, 1000, 400), null, null);
 
   private final ZipIngest ingest = new ZipIngest(LIMITS);
 
