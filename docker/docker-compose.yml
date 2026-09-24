@@ -1,0 +1,43 @@
+# Local stack: PostgreSQL plus Portway built from this repository.
+#
+#   docker compose -f docker/docker-compose.yml up --build
+#   open http://localhost:8080
+#
+# For development against `mvn spring-boot:run` and the Vite dev server, start
+# only the database:  docker compose -f docker/docker-compose.yml up db
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: portway
+      POSTGRES_USER: portway
+      POSTGRES_PASSWORD: portway
+    ports:
+      - "5432:5432"
+    volumes:
+      - portway-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portway"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORTWAY_DB_URL: jdbc:postgresql://db:5432/portway
+      PORTWAY_DB_USER: portway
+      PORTWAY_DB_PASSWORD: portway
+      # Set to enable AI translation of methods the rules cannot handle.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      PORTWAY_AI_ENABLED: ${PORTWAY_AI_ENABLED:-false}
+    ports:
+      - "8080:8080"
+
+volumes:
+  portway-db:

@@ -27,6 +27,22 @@ jobs:
           name: jacoco
           path: '**/target/site/jacoco'
 
+  frontend:
+    name: Frontend (build and test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci --prefix web
+      - run: npm run build --prefix web
+      - run: npm run test --prefix web
+
   fixture:
     name: Sample .NET project compiles
     runs-on: ubuntu-latest
