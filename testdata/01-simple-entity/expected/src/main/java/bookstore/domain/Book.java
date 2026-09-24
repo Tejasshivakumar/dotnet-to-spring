@@ -21,7 +21,7 @@ public class Book {
   @NotNull
   @Size(max = 200)
   @Column(name = "title", length = 200)
-  private String title;
+  private String title = "";
 
   @Size(max = 13)
   @Column(length = 13)

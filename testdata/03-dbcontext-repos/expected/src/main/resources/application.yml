@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: input
+  jpa:
+    open-in-view: false

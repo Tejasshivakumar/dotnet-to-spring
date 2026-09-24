@@ -28,7 +28,19 @@ public enum FindingCode {
   /** ADO.NET and JDBC connection string formats differ. */
   CONNECTION_STRING_FORMAT(Severity.MEDIUM),
   /** Two generated types would share a name. */
-  NAME_COLLISION(Severity.HIGH);
+  NAME_COLLISION(Severity.HIGH),
+  /** A method body could not be translated and was stubbed for a human. */
+  METHOD_STUBBED(Severity.HIGH),
+  /** A C# attribute or construct with no Java equivalent was dropped. */
+  DROPPED_ATTRIBUTE(Severity.LOW),
+  /** A type the classifier could not place was generated as a plain class. */
+  UNCLASSIFIED_TYPE(Severity.MEDIUM),
+  /** A configuration key had no Spring equivalent and was preserved or dropped. */
+  CONFIG_KEY(Severity.INFO),
+  /** A NuGet package mapped to a Maven dependency with caveats worth reading. */
+  PACKAGE_MAPPING(Severity.MEDIUM),
+  /** Generated code did not compile; see the message for the compiler's error. */
+  COMPILE_ERROR(Severity.HIGH);
 
   private final Severity defaultSeverity;
 

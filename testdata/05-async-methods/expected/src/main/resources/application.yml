@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: input
+  jpa:
+    open-in-view: false
+app:
+  reporting:
+    max-rows: 500
+    title: Monthly

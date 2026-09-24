@@ -68,6 +68,15 @@ public class EntityGenerator {
 
     for (PropertyDecl property : entity.properties()) {
       if (property.isComputed()) {
+        if (property.getterExpression() == null) {
+          findings.add(
+              Finding.at(
+                  FindingCode.METHOD_STUBBED,
+                  entity.name() + "." + property.name() + " has a block getter that was not migrated.",
+                  source.path(),
+                  0));
+          continue;
+        }
         accessors.add(computedGetter(property, context));
         continue;
       }
@@ -79,9 +88,26 @@ public class EntityGenerator {
       note(findings, mapped.notes(), entity, source, property.name());
 
       String fieldName = Names.fieldName(property.name());
-      TypeName fieldType = JavaPoetTypes.toTypeName(mapped.type(), packageName);
+      JavaType javaType = context.qualify(mapped.type());
+      TypeName fieldType = JavaPoetTypes.toTypeName(javaType, packageName);
 
       FieldSpec.Builder field = FieldSpec.builder(fieldType, fieldName, Modifier.PRIVATE);
+      // C# models lean on initializers for non-null defaults: `= string.Empty` on a
+      // required column, `= new List<Book>()` on an association.
+      com.palantir.javapoet.CodeBlock init =
+          Initializers.translate(property.initializer(), javaType, context);
+      if (init != null) {
+        field.initializer(init);
+      }
+      if (property.hasAccessorLogic()) {
+        findings.add(
+            Finding.at(
+                FindingCode.UNSUPPORTED_CONSTRUCT,
+                entity.name() + "." + property.name() + " has accessor logic that was not"
+                    + " migrated; it is now a plain field.",
+                source.path(),
+                0));
+      }
 
       String propertyDoc = Javadoc.fromXmlDoc(property.docComment());
       if (propertyDoc != null) {
@@ -308,7 +334,7 @@ public class EntityGenerator {
     }
   }
 
-  private static String messageFor(FindingCode code, String where) {
+  static String messageFor(FindingCode code, String where) {
     return switch (code) {
       case DECIMAL_ARITHMETIC ->
           where + " uses decimal, mapped to BigDecimal. Arithmetic operators do not carry over.";

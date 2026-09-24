@@ -30,6 +30,11 @@ public final class ProgramScanner {
   private static final Pattern SELF_REGISTRATION =
       Pattern.compile("Add(?:Scoped|Transient|Singleton)\\s*<\\s*([\\w.]+)\\s*>\\s*\\(");
 
+  /** {@code Configure<BookstoreOptions>(builder.Configuration.GetSection("Bookstore"))}. */
+  private static final Pattern CONFIGURE =
+      Pattern.compile(
+          "Configure\\s*<\\s*([\\w.]+)\\s*>\\s*\\([^;]*?GetSection\\s*\\(\\s*\"([^\"]+)\"");
+
   /** {@code AddDbContext<BookstoreDbContext>(...)}. */
   private static final Pattern DB_CONTEXT =
       Pattern.compile("AddDbContext\\s*<\\s*([\\w.]+)\\s*>");
@@ -43,15 +48,26 @@ public final class ProgramScanner {
    * @param implementations concrete types used as the implementation type
    * @param interfaceToImplementation the pairing, so the generator knows which impl serves which
    * @param dbContexts types registered with AddDbContext
+   * @param configurationSections options types bound with {@code Configure<T>}, mapped to the
+   *     configuration section they read
    */
   public record Registrations(
       Set<String> serviceInterfaces,
       Set<String> implementations,
       Map<String, String> interfaceToImplementation,
-      Set<String> dbContexts) {
+      Set<String> dbContexts,
+      Map<String, String> configurationSections) {
+
+    public Registrations(
+        Set<String> serviceInterfaces,
+        Set<String> implementations,
+        Map<String, String> interfaceToImplementation,
+        Set<String> dbContexts) {
+      this(serviceInterfaces, implementations, interfaceToImplementation, dbContexts, Map.of());
+    }
 
     static final Registrations EMPTY =
-        new Registrations(Set.of(), Set.of(), Map.of(), Set.of());
+        new Registrations(Set.of(), Set.of(), Map.of(), Set.of(), Map.of());
   }
 
   /**
@@ -94,7 +110,13 @@ public final class ProgramScanner {
       contexts.add(simpleName(context.group(1)));
     }
 
-    return new Registrations(interfaces, implementations, pairs, contexts);
+    Map<String, String> sections = new LinkedHashMap<>();
+    Matcher configure = CONFIGURE.matcher(source);
+    while (configure.find()) {
+      sections.put(simpleName(configure.group(1)), configure.group(2));
+    }
+
+    return new Registrations(interfaces, implementations, pairs, contexts, sections);
   }
 
   private static String simpleName(String name) {

@@ -12,6 +12,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collection;
 
 @Entity
@@ -24,14 +25,14 @@ public class Author {
   @NotNull
   @Size(max = 120)
   @Column(length = 120)
-  private String name;
+  private String name = "";
 
   @Email private String contactEmail;
 
   private LocalDate bornOn;
 
   @OneToMany(mappedBy = "author", fetch = FetchType.LAZY)
-  private Collection<Book> books;
+  private Collection<Book> books = new ArrayList<>();
 
   public Long getId() {
     return id;

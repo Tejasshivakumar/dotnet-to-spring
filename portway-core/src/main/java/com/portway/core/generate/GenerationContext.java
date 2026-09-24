@@ -6,6 +6,7 @@ import com.portway.core.ir.SourceProject;
 import com.portway.core.ir.TypeDecl;
 import com.portway.core.ir.TypeKind;
 import com.portway.core.ir.TypeRef;
+import com.portway.core.rules.JavaType;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -23,9 +24,31 @@ public record GenerationContext(
     Set<String> entityNames,
     Set<String> enumNames,
     Map<String, TypeDecl> typesByName,
-    String basePackage) {
+    String basePackage,
+    Map<String, String> typeRenames) {
+
+  public GenerationContext {
+    typeRenames = Map.copyOf(typeRenames == null ? Map.of() : typeRenames);
+  }
+
+  public GenerationContext(
+      Set<String> entityNames,
+      Set<String> enumNames,
+      Map<String, TypeDecl> typesByName,
+      String basePackage) {
+    this(entityNames, enumNames, typesByName, basePackage, Map.of());
+  }
 
   public static GenerationContext from(SourceProject project, String basePackage) {
+    return from(project, basePackage, MigrationOptions.defaults());
+  }
+
+  /**
+   * Builds the context, including the renames Java convention asks for: {@code IBookService}
+   * becomes {@code BookService}, and the class that implemented it becomes {@code BookServiceImpl}.
+   */
+  public static GenerationContext from(
+      SourceProject project, String basePackage, MigrationOptions options) {
     Set<String> entities = new LinkedHashSet<>();
     Set<String> enums = new LinkedHashSet<>();
     Map<String, TypeDecl> byName = new LinkedHashMap<>();
@@ -43,7 +66,99 @@ public record GenerationContext(
               }
             });
 
-    return new GenerationContext(entities, enums, byName, basePackage);
+    Map<String, String> renames = new LinkedHashMap<>();
+    if (!options.keepInterfacePrefix()) {
+      project
+          .typesWithRole(ClassRole.SERVICE_INTERFACE)
+          .forEach(i -> renames.put(i.name(), Names.stripInterfacePrefix(i.name())));
+      project
+          .typesWithRole(ClassRole.SERVICE)
+          .forEach(
+              impl -> {
+                boolean collides =
+                    impl.baseTypes().stream()
+                        .anyMatch(b -> impl.name().equals(renames.get(b.name())));
+                if (collides) {
+                  renames.put(impl.name(), impl.name() + "Impl");
+                }
+              });
+    }
+    return new GenerationContext(entities, enums, byName, basePackage, renames);
+  }
+
+  public String dtoPackage() {
+    return basePackage + ".dto";
+  }
+
+  public String servicePackage() {
+    return basePackage + ".service";
+  }
+
+  public String controllerPackage() {
+    return basePackage + ".controller";
+  }
+
+  public String configPackage() {
+    return basePackage + ".config";
+  }
+
+  /** Types the classifier could not place. Generated as plain classes and flagged. */
+  public String modelPackage() {
+    return basePackage + ".model";
+  }
+
+  /** The Java name of a project type, after any convention rename. */
+  public String javaName(String csharpName) {
+    return typeRenames.getOrDefault(csharpName, csharpName);
+  }
+
+  /** The package a project type is generated into, or null for a name that is not one. */
+  public String packageOf(String csharpName) {
+    TypeDecl type = typesByName.get(csharpName);
+    if (type == null) {
+      return null;
+    }
+    if (type.kind() == TypeKind.ENUM) {
+      return entityPackage();
+    }
+    return switch (type.role()) {
+      case ENTITY -> entityPackage();
+      case DTO -> dtoPackage();
+      case SERVICE, SERVICE_INTERFACE -> servicePackage();
+      case CONTROLLER -> controllerPackage();
+      case CONFIGURATION -> configPackage();
+      case REPOSITORY -> repositoryPackage();
+      default -> modelPackage();
+    };
+  }
+
+  /**
+   * Places project types referenced from a mapped Java type into the package and name they were
+   * generated as. The type mapper passes unknown names through without a package, because it has
+   * no idea where the generator will put them.
+   */
+  public JavaType qualify(JavaType type) {
+    java.util.List<JavaType> args = type.typeArgs().stream().map(this::qualify).toList();
+    JavaType withArgs = type.typeArgs().isEmpty() ? type : type.withTypeArgs(args);
+    if (!type.packageName().isEmpty() || type.primitive()) {
+      return withArgs;
+    }
+    String pkg = packageOf(type.simpleName());
+    if (pkg == null) {
+      return withArgs;
+    }
+    return new JavaType(
+        pkg,
+        javaName(type.simpleName()),
+        withArgs.typeArgs(),
+        false,
+        type.arrayDimensions(),
+        type.wildcard());
+  }
+
+  /** The path of a generated Java source file. */
+  public static String javaPath(String packageName, String simpleName) {
+    return "src/main/java/" + packageName.replace('.', '/') + "/" + simpleName + ".java";
   }
 
   public String entityPackage() {

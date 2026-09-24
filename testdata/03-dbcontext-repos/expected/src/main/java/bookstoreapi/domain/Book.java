@@ -30,7 +30,7 @@ public class Book {
   @NotNull
   @Size(min = 1, max = 200)
   @Column(name = "title", length = 200)
-  private String title;
+  private String title = "";
 
   /** ISBN-13, digits only. Optional: older stock predates ISBN. */
   @Size(max = 13)

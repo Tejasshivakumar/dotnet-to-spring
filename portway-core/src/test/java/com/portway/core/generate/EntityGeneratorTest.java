@@ -28,14 +28,28 @@ class EntityGeneratorTest {
   }
 
   @Test
-  void generatesEntitiesRepositoriesAndEnums() {
+  void generatesEveryRoleInDependencyOrder() {
+    // Generation order is dependency order: build files first, then enums before
+    // the entities that use them, then the repositories over those entities.
     assertThat(result.files().keySet())
         .containsExactly(
+            "pom.xml",
+            "src/main/resources/application.yml",
             "src/main/java/bookstoreapi/domain/Genre.java",
             "src/main/java/bookstoreapi/domain/Author.java",
             "src/main/java/bookstoreapi/domain/Book.java",
             "src/main/java/bookstoreapi/repository/BookRepository.java",
-            "src/main/java/bookstoreapi/repository/AuthorRepository.java");
+            "src/main/java/bookstoreapi/repository/AuthorRepository.java",
+            "src/main/java/bookstoreapi/dto/BookResponse.java",
+            "src/main/java/bookstoreapi/dto/CreateBookRequest.java",
+            "src/main/java/bookstoreapi/service/AuthorService.java",
+            "src/main/java/bookstoreapi/service/BookService.java",
+            "src/main/java/bookstoreapi/service/AuthorServiceImpl.java",
+            "src/main/java/bookstoreapi/service/BookServiceImpl.java",
+            "src/main/java/bookstoreapi/controller/AuthorsController.java",
+            "src/main/java/bookstoreapi/controller/BooksController.java",
+            "src/main/java/bookstoreapi/MigratedApplication.java",
+            "MIGRATION-NOTES.md");
   }
 
   /** Enums carry no role, but an entity referencing one does not compile without it. */

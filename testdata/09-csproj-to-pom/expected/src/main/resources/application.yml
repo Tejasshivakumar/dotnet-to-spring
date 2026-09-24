@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: legacy-api
+  datasource:
+    url: jdbc:sqlserver://db.internal:1433;databaseName=Legacy;trustServerCertificate=true
+    username: app
+    password: secret
+  jpa:
+    open-in-view: false
+app:
+  connection-strings:
+    reporting: Server=reports;Database=Reports;User Id=ro;Password=ro
+  features:
+    enable-beta-reports: true
+    retry-policy:
+      max-attempts: 3
+      backoff-seconds:
+        - 1
+        - 5
+        - 30
+logging:
+  level:
+    root: WARN
+    org.hibernate.SQL: INFO

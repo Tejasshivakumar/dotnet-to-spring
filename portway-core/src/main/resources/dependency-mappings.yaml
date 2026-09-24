@@ -1,0 +1,84 @@
+# NuGet package to Maven dependency mappings.
+#
+# Data rather than code, for the same reasons as type-mappings.yaml: reviewable,
+# extendable without a recompile, and every lossy mapping visible in one place.
+#
+# Rules are tried in order and the first match wins, so specific packages come
+# before the wildcard for their family. A trailing * matches any suffix.
+#
+# maven:   groupId:artifactId[:version][:scope]. Versions are left to the Spring
+#          Boot parent wherever it manages them.
+# finding: raised when the mapping is used, with `note` as the message.
+# An empty maven list means "nothing to add", which is different from no match:
+# an unmatched package raises UNKNOWN_PACKAGE.
+
+packages:
+  # ---- EF Core: design-time tooling has no runtime counterpart
+  - match: Microsoft.EntityFrameworkCore.Design
+    maven: []
+  - match: Microsoft.EntityFrameworkCore.Tools
+    maven: []
+
+  # ---- EF Core providers: JPA plus the JDBC driver
+  - match: Npgsql.EntityFrameworkCore.PostgreSQL
+    maven: [org.springframework.boot:spring-boot-starter-data-jpa, org.postgresql:postgresql:runtime]
+  - match: Microsoft.EntityFrameworkCore.SqlServer
+    maven: [org.springframework.boot:spring-boot-starter-data-jpa, com.microsoft.sqlserver:mssql-jdbc:runtime]
+  - match: Pomelo.EntityFrameworkCore.MySql
+    maven: [org.springframework.boot:spring-boot-starter-data-jpa, com.mysql:mysql-connector-j:runtime]
+  - match: Microsoft.EntityFrameworkCore.Sqlite
+    maven: [org.springframework.boot:spring-boot-starter-data-jpa, org.xerial:sqlite-jdbc:runtime, org.hibernate.orm:hibernate-community-dialects]
+  - match: Microsoft.EntityFrameworkCore.InMemory
+    maven: [org.springframework.boot:spring-boot-starter-data-jpa, com.h2database:h2:runtime]
+    finding: PACKAGE_MAPPING
+    note: The EF in-memory provider is not a relational database; H2 is, and behaves differently around constraints.
+  - match: Microsoft.EntityFrameworkCore*
+    maven: [org.springframework.boot:spring-boot-starter-data-jpa]
+
+  # ---- ASP.NET Core
+  - match: Microsoft.AspNetCore.Authentication.JwtBearer
+    maven: [org.springframework.boot:spring-boot-starter-oauth2-resource-server]
+    finding: AUTH_ATTRIBUTE
+    note: JWT bearer authentication needs issuer and audience configuration under spring.security.oauth2.resourceserver.
+  - match: Microsoft.AspNetCore.OpenApi
+    maven: ["org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdoc.version}"]
+  - match: Microsoft.AspNetCore*
+    maven: [org.springframework.boot:spring-boot-starter-web]
+  - match: Swashbuckle.AspNetCore*
+    maven: ["org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdoc.version}"]
+
+  # ---- Cross-cutting libraries
+  - match: Serilog*
+    maven: []
+    finding: PACKAGE_MAPPING
+    note: Logging is built in through spring-boot-starter-logging (Logback). Serilog sinks and enrichers need re-creating in logback-spring.xml.
+  - match: AutoMapper*
+    maven: [org.mapstruct:mapstruct:1.6.3]
+    finding: PACKAGE_MAPPING
+    note: MapStruct replaces AutoMapper, but mapping profiles do not translate and must be rewritten as mapper interfaces.
+  - match: FluentValidation*
+    maven: [org.springframework.boot:spring-boot-starter-validation]
+    finding: PACKAGE_MAPPING
+    note: FluentValidation rules are code, not attributes, and were not translated. Re-express them as Bean Validation constraints.
+  - match: Newtonsoft.Json
+    maven: []
+    finding: PACKAGE_MAPPING
+    note: Jackson is Spring's JSON library. Newtonsoft attributes and converters need Jackson equivalents.
+  - match: System.Text.Json
+    maven: []
+  - match: Microsoft.Extensions.*
+    maven: []
+
+  # ---- Tests
+  - match: xunit*
+    maven: [org.springframework.boot:spring-boot-starter-test:test]
+  - match: NUnit*
+    maven: [org.springframework.boot:spring-boot-starter-test:test]
+  - match: MSTest*
+    maven: [org.springframework.boot:spring-boot-starter-test:test]
+  - match: Moq
+    maven: [org.mockito:mockito-core:test]
+  - match: Microsoft.NET.Test.Sdk
+    maven: []
+  - match: coverlet*
+    maven: []

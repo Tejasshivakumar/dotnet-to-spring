@@ -178,7 +178,31 @@ additive_expression
     ;
 
 multiplicative_expression
-    : unary_expression (('*' | '/' | '%') unary_expression)*
+    : switch_expression (('*' | '/' | '%') switch_expression)*
+    ;
+
+// PORTWAY PATCH: C# 8 switch expressions. See PARSER-NOTES.md.
+// The arms' patterns are accepted as balanced token runs rather than parsed:
+// method bodies are carried as source text, so the parser only has to accept
+// the construct, not understand it. The body rewriter decides what it becomes.
+switch_expression
+    : unary_expression (SWITCH OPEN_BRACE (switch_expression_arm (COMMA switch_expression_arm)* COMMA?)? CLOSE_BRACE)?
+    ;
+
+switch_expression_arm
+    : switch_pattern_atom+ (WHEN expression)? right_arrow throwable_expression
+    ;
+
+switch_pattern_atom
+    : OPEN_BRACE balanced_token* CLOSE_BRACE
+    | OPEN_PARENS balanced_token* CLOSE_PARENS
+    | ~(ASSIGNMENT | COMMA | OPEN_BRACE | CLOSE_BRACE | OPEN_PARENS | CLOSE_PARENS | WHEN)
+    ;
+
+balanced_token
+    : OPEN_BRACE balanced_token* CLOSE_BRACE
+    | OPEN_PARENS balanced_token* CLOSE_PARENS
+    | ~(OPEN_BRACE | CLOSE_BRACE | OPEN_PARENS | CLOSE_PARENS)
     ;
 
 // https://msdn.microsoft.com/library/6a71f45d(v=vs.110).aspx
@@ -225,6 +249,8 @@ primary_expression_start
         )
         | anonymous_object_initializer
         | rank_specifier array_initializer
+        // PORTWAY PATCH: C# 9 target-typed new(). See PARSER-NOTES.md.
+        | object_creation_expression
     )                                                                                               # objectCreationExpression
     | OPEN_PARENS argument ( ',' argument)+ CLOSE_PARENS                                            # tupleExpression
     | TYPEOF OPEN_PARENS (unbound_type_name | type_ | VOID) CLOSE_PARENS                            # typeofExpression
