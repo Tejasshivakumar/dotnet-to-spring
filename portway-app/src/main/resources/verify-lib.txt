@@ -1,0 +1,25 @@
+# Jars under verify-lib/ that make up the in-process verifier's classpath.
+# Kept in step with the maven-dependency-plugin copy execution in pom.xml;
+# VerifyClasspathTest fails if the two drift.
+spring-core.jar
+spring-jcl.jar
+spring-beans.jar
+spring-context.jar
+spring-aop.jar
+spring-expression.jar
+spring-web.jar
+spring-webmvc.jar
+spring-tx.jar
+spring-data-commons.jar
+spring-data-jpa.jar
+spring-boot.jar
+spring-boot-autoconfigure.jar
+jakarta.persistence-api.jar
+jakarta.validation-api.jar
+jakarta.servlet-api.jar
+jackson-annotations.jar
+slf4j-api.jar
+spring-security-core.jar
+spring-security-config.jar
+micrometer-observation.jar
+micrometer-commons.jar

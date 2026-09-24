@@ -1,5 +1,6 @@
 package com.portway.app;
 
+import com.portway.app.cli.PortwayCli;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -7,6 +8,14 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class PortwayApplication {
 
   public static void main(String[] args) {
+    // `migrate` runs the pipeline from the command line and never starts the web
+    // application, so it needs no database and no configuration.
+    if (args.length > 0 && args[0].equals("migrate")) {
+      PortwayCli cli = new PortwayCli(System.out, System.err, () -> {
+        throw new IllegalStateException("AI translation is not available yet");
+      });
+      System.exit(cli.run(args));
+    }
     SpringApplication.run(PortwayApplication.class, args);
   }
 }

@@ -79,6 +79,83 @@
 
   <build>
     <plugins>
+      <!--
+        The APIs generated code may import, copied into the jar as plain resources
+        under verify-lib/ for the in-process compile verifier. Deliberately NOT on
+        the application's own classpath: Spring Security there would switch on
+        security auto-configuration for Portway itself. Versions come from the
+        Spring Boot BOM, the same one the generated pom's parent uses.
+        Keep in step with src/main/resources/verify-lib.txt.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>verify-classpath</id>
+            <phase>generate-resources</phase>
+            <goals><goal>copy</goal></goals>
+            <configuration>
+              <outputDirectory>${project.build.outputDirectory}/verify-lib</outputDirectory>
+              <stripVersion>true</stripVersion>
+              <artifactItems>
+                <artifactItem><groupId>org.springframework</groupId><artifactId>spring-core</artifactId></artifactItem>
+                <artifactItem><groupId>org.springframework</groupId><artifactId>spring-jcl</artifactId></artifactItem>
+                <artifactItem><groupId>org.springframework</groupId><artifactId>spring-beans</artifactId></artifactItem>
+                <artifactItem><groupId>org.springframework</groupId><artifactId>spring-context</artifactId></artifactItem>
+                <artifactItem><groupId>org.springframework</groupId><artifactId>spring-aop</artifactId></artifactItem>
+                <artifactItem><groupId>org.springframework</groupId><artifactId>spring-expression</artifactId></artifactItem>
+                <artifactItem><groupId>org.springframework</groupId><artifactId>spring-web</artifactId></artifactItem>
+                <artifactItem><groupId>org.springframework</groupId><artifactId>spring-webmvc</artifactId></artifactItem>
+                <artifactItem><groupId>org.springframework</groupId><artifactId>spring-tx</artifactId></artifactItem>
+                <artifactItem><groupId>org.springframework.data</groupId><artifactId>spring-data-commons</artifactId></artifactItem>
+                <artifactItem><groupId>org.springframework.data</groupId><artifactId>spring-data-jpa</artifactId></artifactItem>
+                <artifactItem><groupId>org.springframework.boot</groupId><artifactId>spring-boot</artifactId></artifactItem>
+                <artifactItem><groupId>org.springframework.boot</groupId><artifactId>spring-boot-autoconfigure</artifactId></artifactItem>
+                <artifactItem><groupId>jakarta.persistence</groupId><artifactId>jakarta.persistence-api</artifactId></artifactItem>
+                <artifactItem><groupId>jakarta.validation</groupId><artifactId>jakarta.validation-api</artifactId></artifactItem>
+                <artifactItem><groupId>jakarta.servlet</groupId><artifactId>jakarta.servlet-api</artifactId></artifactItem>
+                <artifactItem><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-annotations</artifactId></artifactItem>
+                <artifactItem><groupId>org.slf4j</groupId><artifactId>slf4j-api</artifactId></artifactItem>
+                <artifactItem><groupId>org.springframework.security</groupId><artifactId>spring-security-core</artifactId></artifactItem>
+                <artifactItem><groupId>org.springframework.security</groupId><artifactId>spring-security-config</artifactId></artifactItem>
+                <artifactItem><groupId>io.micrometer</groupId><artifactId>micrometer-observation</artifactId></artifactItem>
+                <artifactItem><groupId>io.micrometer</groupId><artifactId>micrometer-commons</artifactId></artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!--
+        google-java-format (via portway-core) reaches into jdk.compiler internals.
+        The Add-Exports manifest attribute grants that for `java -jar` without
+        asking every user for extra JVM flags; surefire gets the same below.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifestEntries>
+              <Add-Exports>jdk.compiler/com.sun.tools.javac.api jdk.compiler/com.sun.tools.javac.code jdk.compiler/com.sun.tools.javac.file jdk.compiler/com.sun.tools.javac.parser jdk.compiler/com.sun.tools.javac.tree jdk.compiler/com.sun.tools.javac.util</Add-Exports>
+            </manifestEntries>
+          </archive>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <argLine>
+            --add-exports jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+            --add-exports jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED
+            --add-exports jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
+            --add-exports jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
+            --add-exports jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+            --add-exports jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+          </argLine>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>

@@ -84,6 +84,44 @@ public final class CSharpText {
     return new Masked(out.toString(), literals);
   }
 
+  /**
+   * The source with every literal and comment blanked to spaces, newlines kept. Offsets and line
+   * numbers are unchanged, which is what mapping a compiler error back to a method needs.
+   */
+  public static String blank(String source) {
+    StringBuilder out = new StringBuilder(source);
+    int i = 0;
+    while (i < source.length()) {
+      char c = source.charAt(i);
+      int end = -1;
+      if (c == '"' && source.startsWith("\"\"\"", i)) {
+        int close = source.indexOf("\"\"\"", i + 3);
+        end = close < 0 ? source.length() : close + 3;
+      } else if (c == '"') {
+        end = endOfQuoted(source, i, '"');
+      } else if (c == '\'') {
+        end = endOfQuoted(source, i, '\'');
+      } else if (c == '/' && i + 1 < source.length() && source.charAt(i + 1) == '/') {
+        int newline = source.indexOf('\n', i);
+        end = newline < 0 ? source.length() : newline;
+      } else if (c == '/' && i + 1 < source.length() && source.charAt(i + 1) == '*') {
+        int close = source.indexOf("*/", i + 2);
+        end = close < 0 ? source.length() : close + 2;
+      }
+      if (end > i) {
+        for (int j = i; j < end; j++) {
+          if (out.charAt(j) != '\n') {
+            out.setCharAt(j, ' ');
+          }
+        }
+        i = end;
+      } else {
+        i++;
+      }
+    }
+    return out.toString();
+  }
+
   /** Index just past the closing quote of a literal starting at {@code start}. */
   private static int endOfQuoted(String s, int start, char quote) {
     int i = start + 1;
