@@ -36,32 +36,58 @@ essentially no modern C# parses at all.
 
 ## The supported subset
 
-Measured, not asserted: `CSharpSourceParserTest` parses every `.cs` file in
-`sample-dotnet/` and fails the build on any syntax error.
+Measured, not asserted. `CSharpSourceParserTest` parses every `.cs` file in
+`sample-dotnet/` and fails the build on any syntax error, and `SupportedSubsetTest`
+pins down each rejection and each construct that must survive into the IR intact.
 
-### Parsed by the grammar
+A file is accepted only if it both parses and passes `SubsetValidator`. The grammar
+accepts much more than the IR can represent; without the validator a pointer field
+parsed cleanly and quietly became an `int`.
 
-- Namespaces, both file-scoped and block-scoped
+### Accepted and preserved in the IR
+
+- Namespaces, file-scoped or block-scoped, including nested ones, as long as every
+  type in the file sits in one namespace
+- Using directives at file level and inside a block namespace
 - Classes, interfaces, enums, structs
-- Fields, auto-properties and properties with bodies, methods, constructors
+- Fields, auto-properties, properties with accessor logic (getter and setter bodies
+  are kept as source text), methods, constructors
+- Expression-bodied methods and properties, kept exactly as written (`=> expr`); the
+  body rewriter decides whether that becomes `return expr;`, `expr;` or `throw ...;`
+- `params` arrays, kept as varargs parameters; `ref`, `out` and `in` parameters, kept
+  with their modifier so the method can be routed to manual review
 - Attributes with positional and named arguments
 - Generics, arrays, nullable value types (`int?`) and nullable reference types (`string?`)
 - `async` / `await`, LINQ method syntax, string interpolation, lambdas
 - XML doc comments (on a separate token channel)
 
-### Not parsed, and what happens instead
+### Rejected, with the construct named and its line
 
-| Construct | Why | What happens |
-|---|---|---|
-| Top-level statements (`Program.cs`) | v7 predates C# 9 | Handled by a dedicated scanner that looks only for DI registrations and `AddDbContext`, not by the full parser |
-| `record` types | v7 predates C# 9 | Syntax error, file rejected with the construct named |
-| `#if` and other preprocessor directives | Directives go to a separate channel and are not evaluated | Code inside them is parsed as if the directive were absent |
-| `unsafe`, `stackalloc`, pointer types | Out of scope | Syntax error, file rejected |
-| LINQ query syntax (`from x in y select`) | Method syntax only, by choice | Syntax error, file rejected |
+| Construct | Why |
+|---|---|
+| `record` types | v7 predates C# 9: reported as a syntax error |
+| `unsafe`, pointer types, `fixed`, `stackalloc` | No Java equivalent |
+| LINQ query syntax (`from x in y select`) | Method syntax only, by choice |
+| Nested type declarations | Hoisting one changes its name and its access to the outer class's private members |
+| Types in more than one namespace in one file | The IR records one namespace per file |
+| Indexers, operator overloads, conversion operators | No Spring-shaped equivalent worth guessing at |
+| Events, finalizers | Same |
+
+The rejection becomes an `UNSUPPORTED_CONSTRUCT` finding and the rest of the project
+still migrates.
 
 Rejection is deliberate and loud. A parser that silently produces a half-built IR
 for a file it did not understand produces plausible-looking Java that is wrong,
 which is worse than a clear error naming the construct.
+
+### Handled outside the grammar
+
+| Input | What happens |
+|---|---|
+| `Program.cs` / `Startup.cs` (top-level statements, C# 9) | Not parsed. `ProgramScanner` reads DI registrations (`AddScoped<IFoo, Foo>`) and `AddDbContext<T>` from the raw text with targeted regexes. Registrations built at runtime are invisible to it, and classification falls back to naming conventions. |
+| `#if` and other preprocessor directives | Evaluated by the vendored lexer with **no symbols defined**: `#if DEBUG` takes its `#else` branch, `#if false` code disappears. The IR reflects a Release build with no custom symbols. |
+| `.csproj` | Read as XML for `TargetFramework` and `PackageReference`s. External entities are disabled. |
+| `appsettings.json` | Read with Jackson into an ordered map. |
 
 ## Why the parse tree is not the IR
 

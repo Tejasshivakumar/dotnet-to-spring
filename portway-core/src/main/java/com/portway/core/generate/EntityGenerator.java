@@ -270,7 +270,7 @@ public class EntityGenerator {
         .addModifiers(Modifier.PUBLIC)
         .addAnnotation(ClassName.get(JPA, "Transient"))
         .returns(JavaPoetTypes.toTypeName(mapped.type(), context.entityPackage()))
-        .addStatement("return $L", rewriteMemberReferences(property.initializer()))
+        .addStatement("return $L", rewriteMemberReferences(property.getterExpression()))
         .build();
   }
 

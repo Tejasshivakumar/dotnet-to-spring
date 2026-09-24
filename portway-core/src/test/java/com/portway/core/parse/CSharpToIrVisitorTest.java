@@ -97,7 +97,8 @@ class CSharpToIrVisitorTest {
     PropertyDecl inStock = property(book, "InStock");
     assertThat(inStock.hasGetter()).isTrue();
     assertThat(inStock.hasSetter()).isFalse();
-    assertThat(inStock.initializer()).isEqualTo("StockCount > 0");
+    assertThat(inStock.getterExpression()).isEqualTo("StockCount > 0");
+    assertThat(inStock.initializer()).isNull();
   }
 
   @Test

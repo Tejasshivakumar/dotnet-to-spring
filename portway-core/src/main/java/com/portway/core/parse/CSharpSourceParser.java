@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -15,6 +17,9 @@ import org.antlr.v4.runtime.CommonTokenStream;
  *
  * <p>This is the only place in the codebase that knows ANTLR exists beyond the visitor. Everything
  * downstream works from the IR.
+ *
+ * <p>A file is {@code ok} only when it both parses and stays inside the supported subset. See
+ * {@link SubsetValidator} and PARSER-NOTES.md.
  */
 public class CSharpSourceParser {
 
@@ -43,6 +48,14 @@ public class CSharpSourceParser {
     parser.addErrorListener(listener);
 
     CSharpParser.Compilation_unitContext tree = parser.compilation_unit();
-    return new ParseResult(path, tree, tokens, listener.errors());
+
+    // Only a tree that parsed cleanly is worth checking against the supported
+    // subset; after a syntax error ANTLR's recovery produces fragments that would
+    // trigger spurious rejections.
+    List<SyntaxError> errors = new ArrayList<>(listener.errors());
+    if (errors.isEmpty()) {
+      errors.addAll(SubsetValidator.validate(tree, path));
+    }
+    return new ParseResult(path, tree, tokens, errors);
   }
 }

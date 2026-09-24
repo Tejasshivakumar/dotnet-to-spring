@@ -10,7 +10,9 @@ import java.util.List;
  * needed in three places: token rewriting, the LLM prompt, and the "original C#" comment block on
  * methods that could not be migrated.
  *
- * @param bodyRaw exact source text, or null for an abstract or interface method
+ * @param bodyRaw exact source text: a block including braces, or for an expression-bodied method
+ *     the arrow form without its semicolon ({@code => x * 2}); null for an abstract or interface
+ *     method
  * @param startLine 1-based first line in the C# file, used to map findings back to source
  */
 public record MethodDecl(
@@ -36,5 +38,27 @@ public record MethodDecl(
 
   public boolean hasBody() {
     return bodyRaw != null && !bodyRaw.isBlank();
+  }
+
+  /** {@code int Double(int x) => x * 2;} rather than a block. */
+  public boolean isExpressionBodied() {
+    return bodyRaw != null && bodyRaw.startsWith("=>");
+  }
+
+  /** The expression of an expression-bodied method, or null for a block body. */
+  public String expressionBody() {
+    return isExpressionBodied() ? bodyRaw.substring(2).strip() : null;
+  }
+
+  public boolean hasAttribute(String attributeName) {
+    return attributes.stream().anyMatch(a -> a.name().equals(attributeName));
+  }
+
+  public boolean isStatic() {
+    return modifiers.contains("static");
+  }
+
+  public boolean isPublic() {
+    return modifiers.contains("public");
   }
 }

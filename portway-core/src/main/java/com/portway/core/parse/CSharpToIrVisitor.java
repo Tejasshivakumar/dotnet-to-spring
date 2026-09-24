@@ -39,26 +39,35 @@ public class CSharpToIrVisitor {
     this.tokens = tokens;
   }
 
-  /** Converts a parsed file. Types nested inside namespaces are flattened into one list. */
+  /**
+   * Converts a parsed file. Types nested inside namespaces are flattened into one list.
+   *
+   * <p>Flattening is safe because {@link SubsetValidator} has already rejected files that declare
+   * types in more than one namespace, so every type here shares {@code namespaceName}.
+   */
   public SourceFile toSourceFile(ParseResult parsed) {
     CSharpParser.Compilation_unitContext unit = parsed.tree();
 
-    List<String> usings = new ArrayList<>();
-    if (unit.using_directives() != null) {
-      for (CSharpParser.Using_directiveContext u : unit.using_directives().using_directive()) {
-        String name = usingName(u);
-        if (name != null) {
-          usings.add(name);
-        }
-      }
-    }
-
     Namespace collected = new Namespace();
+    collectUsings(unit.using_directives(), collected);
     if (unit.namespace_member_declarations() != null) {
       collectMembers(unit.namespace_member_declarations(), "", collected);
     }
 
-    return new SourceFile(parsed.path(), collected.name, usings, collected.types);
+    return new SourceFile(parsed.path(), collected.name, collected.usings, collected.types);
+  }
+
+  /** Using directives are legal both at file level and inside a block-scoped namespace. */
+  private void collectUsings(CSharpParser.Using_directivesContext ctx, Namespace out) {
+    if (ctx == null) {
+      return;
+    }
+    for (CSharpParser.Using_directiveContext u : ctx.using_directive()) {
+      String name = usingName(u);
+      if (name != null && !out.usings.contains(name)) {
+        out.usings.add(name);
+      }
+    }
   }
 
   /**
@@ -81,6 +90,7 @@ public class CSharpToIrVisitor {
   /** Accumulator for the recursive namespace walk. */
   private static final class Namespace {
     private String name = "";
+    private final List<String> usings = new ArrayList<>();
     private final List<TypeDecl> types = new ArrayList<>();
   }
 
@@ -92,6 +102,11 @@ public class CSharpToIrVisitor {
       } else if (member.type_declaration() != null) {
         TypeDecl type = toTypeDecl(member.type_declaration());
         if (type != null) {
+          // The file's namespace is the one its types live in, which for
+          // `namespace A { namespace B { class X {} } }` is A.B, not the outer A.
+          if (out.types.isEmpty()) {
+            out.name = prefix;
+          }
           out.types.add(type);
         }
       }
@@ -103,6 +118,9 @@ public class CSharpToIrVisitor {
     if (ctx instanceof CSharpParser.Block_scoped_namespaceContext block) {
       String qualified = qualify(prefix, textOf(block.qualified_identifier()), out);
       CSharpParser.Namespace_bodyContext body = block.namespace_body();
+      if (body != null) {
+        collectUsings(body.using_directives(), out);
+      }
       if (body != null && body.namespace_member_declarations() != null) {
         collectMembers(body.namespace_member_declarations(), qualified, out);
       }
@@ -114,16 +132,9 @@ public class CSharpToIrVisitor {
     }
   }
 
-  /**
-   * Joins a nested namespace onto its parent, recording the first one seen as the file's namespace.
-   * Nesting is rare enough that flattening it beats modelling scope.
-   */
+  /** Joins a nested namespace onto its parent. */
   private String qualify(String prefix, String name, Namespace out) {
-    String qualified = prefix.isEmpty() ? name : prefix + "." + name;
-    if (out.name.isEmpty()) {
-      out.name = qualified;
-    }
-    return qualified;
+    return prefix.isEmpty() ? name : prefix + "." + name;
   }
 
   // ---------------------------------------------------------------- types
@@ -367,8 +378,10 @@ public class CSharpToIrVisitor {
     if (ctx.method_body() != null && ctx.method_body().block() != null) {
       body = textOf(ctx.method_body().block());
     } else if (ctx.throwable_expression() != null) {
-      // Expression-bodied method: wrapped so downstream sees a normal block.
-      body = "{ return " + textOf(ctx.throwable_expression()) + "; }";
+      // Kept exactly as written. Turning it into a block here would mean deciding
+      // between `return x;`, `x;` and `throw x;`, which depends on the return type
+      // and belongs to the body rewriter, not the parser.
+      body = arrowText(ctx.throwable_expression());
     }
 
     return new MethodDecl(
@@ -393,19 +406,37 @@ public class CSharpToIrVisitor {
     boolean hasGetter = false;
     boolean hasSetter = false;
     String initializer = null;
+    String getterBody = null;
+    String setterBody = null;
 
     CSharpParser.Accessor_declarationsContext accessors = ctx.accessor_declarations();
     if (accessors != null) {
-      hasGetter = accessors.GET() != null || accessors.get_accessor_declaration() != null;
-      hasSetter = accessors.SET() != null || accessors.set_accessor_declaration() != null;
+      // The grammar puts the first accessor's body directly on accessor_declarations
+      // and the second, if any, on its own sub-rule.
+      String firstBody = accessorBody(accessors.accessor_body());
+      if (accessors.GET() != null) {
+        hasGetter = true;
+        getterBody = firstBody;
+        if (accessors.set_accessor_declaration() != null) {
+          hasSetter = true;
+          setterBody = accessorBody(accessors.set_accessor_declaration().accessor_body());
+        }
+      } else if (accessors.SET() != null) {
+        hasSetter = true;
+        setterBody = firstBody;
+        if (accessors.get_accessor_declaration() != null) {
+          hasGetter = true;
+          getterBody = accessorBody(accessors.get_accessor_declaration().accessor_body());
+        }
+      }
       if (ctx.variable_initializer() != null) {
         initializer = textOf(ctx.variable_initializer());
       }
     } else if (ctx.throwable_expression() != null) {
-      // Expression-bodied property: read-only, and the expression is a body rather
-      // than an initial value. Kept as the initializer so the generator can decide.
+      // Expression-bodied property: read-only, and the expression is a getter body,
+      // not an initial value.
       hasGetter = true;
-      initializer = textOf(ctx.throwable_expression());
+      getterBody = arrowText(ctx.throwable_expression());
     }
 
     return new PropertyDecl(
@@ -416,25 +447,64 @@ public class CSharpToIrVisitor {
         hasGetter,
         hasSetter,
         initializer,
-        doc);
+        doc,
+        getterBody,
+        setterBody);
+  }
+
+  /** An accessor's body source, or null for an auto-accessor ({@code get;}). */
+  private String accessorBody(CSharpParser.Accessor_bodyContext ctx) {
+    if (ctx == null) {
+      return null;
+    }
+    if (ctx.block() != null) {
+      return textOf(ctx.block());
+    }
+    if (ctx.throwable_expression() != null) {
+      return arrowText(ctx.throwable_expression());
+    }
+    return null;
+  }
+
+  /**
+   * {@code => expression} exactly as written, without the trailing semicolon. The arrow is kept so
+   * an expression body can never be mistaken for a block body downstream.
+   */
+  private static String arrowText(CSharpParser.Throwable_expressionContext expression) {
+    return "=> " + textOf(expression);
   }
 
   private List<ParamDecl> toParams(CSharpParser.Formal_parameter_listContext ctx) {
     List<ParamDecl> params = new ArrayList<>();
-    if (ctx == null || ctx.fixed_parameters() == null) {
+    if (ctx == null) {
       return params;
     }
-    for (CSharpParser.Fixed_parameterContext p : ctx.fixed_parameters().fixed_parameter()) {
-      CSharpParser.Arg_declarationContext arg = p.arg_declaration();
-      if (arg == null) {
-        continue;
+    if (ctx.fixed_parameters() != null) {
+      for (CSharpParser.Fixed_parameterContext p : ctx.fixed_parameters().fixed_parameter()) {
+        CSharpParser.Arg_declarationContext arg = p.arg_declaration();
+        if (arg == null) {
+          continue;
+        }
+        params.add(
+            new ParamDecl(
+                arg.identifier().getText(),
+                toTypeRef(arg.type_()),
+                toAttributes(p.attributes()),
+                arg.expression() == null ? null : textOf(arg.expression()),
+                p.parameter_modifier() == null ? null : parameterModifier(p.parameter_modifier())));
       }
+    }
+    // `params string[] values` sits outside fixed_parameters in the grammar. Missing
+    // it would silently change the method's signature.
+    CSharpParser.Parameter_arrayContext array = ctx.parameter_array();
+    if (array != null) {
       params.add(
           new ParamDecl(
-              arg.identifier().getText(),
-              toTypeRef(arg.type_()),
-              toAttributes(p.attributes()),
-              arg.expression() == null ? null : textOf(arg.expression())));
+              array.identifier().getText(),
+              arrayTypeRef(array.array_type()),
+              toAttributes(array.attributes()),
+              null,
+              "params"));
     }
     return params;
   }
@@ -533,6 +603,27 @@ public class CSharpToIrVisitor {
       }
     }
     return new TypeRef(base.name(), base.typeArgs(), nullable, rank);
+  }
+
+  /** {@code string[]} in a {@code params} parameter, which the grammar spells as array_type. */
+  private TypeRef arrayTypeRef(CSharpParser.Array_typeContext ctx) {
+    TypeRef base = baseTypeRef(ctx.base_type());
+    return new TypeRef(base.name(), base.typeArgs(), false, ctx.rank_specifier().size());
+  }
+
+  private String parameterModifier(CSharpParser.Parameter_modifierContext ctx) {
+    // `ref this` and `in this` are extension-method receivers passed by reference;
+    // the by-reference part is what matters for translation.
+    if (ctx.REF() != null) {
+      return "ref";
+    }
+    if (ctx.OUT() != null) {
+      return "out";
+    }
+    if (ctx.IN() != null) {
+      return "in";
+    }
+    return "this";
   }
 
   private TypeRef baseTypeRef(CSharpParser.Base_typeContext ctx) {
