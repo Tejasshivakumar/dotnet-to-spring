@@ -152,6 +152,14 @@ public class EntityGenerator {
 
     List<JavaAnnotation> annotations = new ArrayList<>(mapped.annotations());
 
+    if (isIdentifier(entity, property)) {
+      conventionKey(property, annotations);
+    }
+
+    if (context.isSingleAssociation(property) || context.isCollectionAssociation(property)) {
+      lazyAssociationIsNotSerialised(entity, property, annotations, findings, source);
+    }
+
     if (context.isSingleAssociation(property)) {
       annotations.add(0, manyToOne(entity, property));
       // The association owns the join column, so any [ForeignKey] name moves here.
@@ -173,6 +181,61 @@ public class EntityGenerator {
     }
 
     return JavaPoetTypes.toAnnotationSpecs(attributeMapper.merge(annotations));
+  }
+
+  /**
+   * EF treats a property named {@code Id} or {@code <Type>Id} as the key without any attribute, and
+   * generates its value on insert when it is numeric or a Guid. JPA needs both said explicitly:
+   * without {@code @Id} the application fails at startup, which compiling alone cannot catch.
+   */
+  private void conventionKey(PropertyDecl property, List<JavaAnnotation> annotations) {
+    boolean hasId = annotations.stream().anyMatch(a -> a.simpleName().equals("Id"));
+    if (!hasId) {
+      annotations.add(0, JavaAnnotation.marker(JPA + ".Id"));
+    }
+    boolean generationDecided =
+        property.hasAttribute("DatabaseGenerated")
+            || annotations.stream().anyMatch(a -> a.simpleName().equals("GeneratedValue"));
+    if (generationDecided) {
+      return;
+    }
+    String type = property.type().name();
+    String strategy =
+        switch (type) {
+          case "int", "long", "short" -> "IDENTITY";
+          case "Guid" -> "UUID";
+          default -> null;
+        };
+    if (strategy != null) {
+      annotations.add(
+          1,
+          new JavaAnnotation(
+              JavaType.of(JPA + ".GeneratedValue"),
+              Map.of("strategy", "jakarta.persistence.GenerationType." + strategy)));
+    }
+  }
+
+  /**
+   * A lazy association serialised to JSON after the session has closed throws, and one that is
+   * loaded can recurse back through its inverse forever. EF, by contrast, writes whatever happened
+   * to be loaded. The association is kept out of JSON, and the reviewer is told, because an API
+   * client that relied on the field will notice.
+   */
+  private void lazyAssociationIsNotSerialised(
+      TypeDecl entity,
+      PropertyDecl property,
+      List<JavaAnnotation> annotations,
+      List<Finding> findings,
+      SourceFile source) {
+    annotations.add(JavaAnnotation.marker("com.fasterxml.jackson.annotation.JsonIgnore"));
+    findings.add(
+        Finding.at(
+            FindingCode.LAZY_ASSOCIATION,
+            entity.name() + "." + property.name() + " is a lazy JPA association and is left out of"
+                + " JSON (@JsonIgnore). EF serialised whatever was loaded; if API clients read this"
+                + " field, return a DTO that includes it.",
+            source.path(),
+            0));
   }
 
   private JavaAnnotation manyToOne(TypeDecl entity, PropertyDecl property) {

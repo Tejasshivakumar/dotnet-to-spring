@@ -1,5 +1,6 @@
 package bookstoreapi.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -32,6 +33,7 @@ public class Author {
   private LocalDate bornOn;
 
   @OneToMany(mappedBy = "author", fetch = FetchType.LAZY)
+  @JsonIgnore
   private Collection<Book> books = new ArrayList<>();
 
   public Long getId() {

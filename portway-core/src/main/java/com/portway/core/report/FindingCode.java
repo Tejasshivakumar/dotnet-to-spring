@@ -37,6 +37,8 @@ public enum FindingCode {
   UNCLASSIFIED_TYPE(Severity.MEDIUM),
   /** A configuration key had no Spring equivalent and was preserved or dropped. */
   CONFIG_KEY(Severity.INFO),
+  /** An entity association is kept out of JSON, which changes the shape of any API returning it. */
+  LAZY_ASSOCIATION(Severity.MEDIUM),
   /** A NuGet package mapped to a Maven dependency with caveats worth reading. */
   PACKAGE_MAPPING(Severity.MEDIUM),
   /** Generated code did not compile; see the message for the compiler's error. */

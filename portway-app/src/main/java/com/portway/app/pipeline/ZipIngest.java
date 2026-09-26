@@ -47,7 +47,20 @@ public class ZipIngest {
    * Extracts into {@code target} and returns the project root inside it: the directory holding the
    * .csproj, since zips usually wrap the project in a folder of their own.
    */
-  public Extracted extract(InputStream zip, Path target) {
+  public Extracted extract(InputStream upload, Path target) {
+    // ZipInputStream reads a non-zip as a zip with no entries, which would then be
+    // reported as "no C# sources". Check the local-file-header signature first.
+    java.io.BufferedInputStream zip = new java.io.BufferedInputStream(upload);
+    try {
+      zip.mark(4);
+      byte[] magic = zip.readNBytes(4);
+      zip.reset();
+      if (magic.length < 4 || magic[0] != 'P' || magic[1] != 'K' || magic[2] != 3 || magic[3] != 4) {
+        throw new UploadRejectedException("Not a zip archive");
+      }
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
     Path base = target.toAbsolutePath().normalize();
     int entries = 0;
     int written = 0;

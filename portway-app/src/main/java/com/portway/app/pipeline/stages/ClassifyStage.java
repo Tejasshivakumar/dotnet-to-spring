@@ -8,8 +8,6 @@ import com.portway.app.repo.SourceFileRepository;
 import com.portway.core.ir.ClassRole;
 import com.portway.core.ir.SourceFile;
 import com.portway.core.ir.SourceProject;
-import com.portway.core.ir.TypeDecl;
-import java.util.EnumMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -47,12 +45,14 @@ public class ClassifyStage implements PipelineStage {
       }
     }
 
-    Map<ClassRole, Long> counts = new EnumMap<>(ClassRole.class);
-    project.allTypes().map(TypeDecl::role).forEach(r -> counts.merge(r, 1L, Long::sum));
-    context.stats().put("roles", counts.entrySet().stream()
-        .collect(Collectors.toMap(e -> e.getKey().name(), Map.Entry::getValue, (a, b) -> a, java.util.LinkedHashMap::new)));
+    // Enums carry no role by design: they are generated because entities use them.
+    // Counting them as "unknown" would read like a classification failure.
+    Map<String, Long> counts = new java.util.LinkedHashMap<>();
+    project.allTypes().forEach(t -> counts.merge(
+        t.kind() == com.portway.core.ir.TypeKind.ENUM ? "ENUM" : t.role().name(), 1L, Long::sum));
+    context.stats().put("roles", counts);
     return counts.entrySet().stream()
-        .map(e -> e.getValue() + " " + e.getKey().name().toLowerCase(Locale.ROOT).replace('_', ' '))
+        .map(e -> e.getValue() + " " + e.getKey().toLowerCase(Locale.ROOT).replace('_', ' '))
         .collect(Collectors.joining(", "));
   }
 }

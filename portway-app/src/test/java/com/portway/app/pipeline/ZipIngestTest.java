@@ -90,7 +90,8 @@ class ZipIngestTest {
   @Test
   void refusesSomethingThatIsNotAZipOrHasNoSources(@TempDir Path target) throws IOException {
     assertThatThrownBy(() -> ingest.extract(new ByteArrayInputStream("not a zip".getBytes()), target))
-        .isInstanceOf(UploadRejectedException.class);
+        .isInstanceOf(UploadRejectedException.class)
+        .hasMessage("Not a zip archive");
     assertThatThrownBy(() -> ingest.extract(new ByteArrayInputStream(zip(Map.of("a.txt", "x"))), target))
         .isInstanceOf(UploadRejectedException.class)
         .hasMessageContaining("no C# sources");

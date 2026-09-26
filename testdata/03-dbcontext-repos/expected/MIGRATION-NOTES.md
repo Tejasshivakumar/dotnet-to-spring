@@ -22,6 +22,11 @@ None.
 
 - BookstoreDbContext.OnModelCreating contains fluent configuration that was not translated. It is copied into MIGRATION-NOTES.md; review it against the generated entities. `BookstoreDbContext.cs:16`
 
+### LAZY_ASSOCIATION (MEDIUM, 2)
+
+- Author.Books is a lazy JPA association and is left out of JSON (@JsonIgnore). EF serialised whatever was loaded; if API clients read this field, return a DTO that includes it. `Author.cs`
+- Book.Author is a lazy JPA association and is left out of JSON (@JsonIgnore). EF serialised whatever was loaded; if API clients read this field, return a DTO that includes it. `Book.cs`
+
 ### NULLABLE_REFERENCE (LOW, 1)
 
 - Book.Author was a nullable reference type; Java does not enforce this. `Book.cs`

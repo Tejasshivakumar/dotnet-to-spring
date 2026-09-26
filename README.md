@@ -46,6 +46,26 @@ Without AI:
 With AI enabled, the decimal method is the only one the model is asked to translate. The
 `yield return` method is never sent to it.
 
+The generated application also runs: against PostgreSQL it serves every migrated endpoint,
+including validation errors, 404s and the `Location` header on create.
+
+### On code it was not written against
+
+The sample was written alongside the tool, so it proves less than it seems. Portway was also run on
+Microsoft's own [TodoApi tutorial](https://github.com/dotnet/AspNetCore.Docs/tree/main/aspnetcore/tutorials/first-web-api/samples/8.0),
+both variants, unchanged:
+
+| | TodoApi | TodoApiDTO |
+|---|---|---|
+| Method bodies by rules | 5 of 7 | 6 of 8 |
+| Flagged | a `throw;` rethrow; `Enumerable.Range(...).ToArray()` | a `catch ... when` exception filter; the same `ToArray()` |
+| Generated app | compiles, starts, full CRUD works, JSON matches the .NET shape | same |
+
+That run found two bugs that compiling could not: EF's convention key (a bare `Id` property) got no
+`@Id`, so the app failed at startup, and returning an entity with a lazy association failed during
+JSON serialisation. Both are fixed, and a test now boots Hibernate over every generated entity so
+that class of error fails the build.
+
 ## What it handles
 
 - **Structure:** namespaces (file-scoped and block), classes, interfaces, enums, properties with
@@ -150,15 +170,16 @@ API documentation is served at `/swagger-ui.html`.
 
 | Suite | What it covers |
 |---|---|
-| Golden files, [`testdata/`](testdata) | Nine input/expected-output cases: entities, controllers, repositories, LINQ, async, validation, nullable types, unsupported constructs, csproj to pom. Every expectation is also compiled. Regenerate with `-Dupdate.golden=true`, then read the diff |
+| Golden files, [`testdata/`](testdata) | Ten input/expected-output cases: entities, controllers, repositories, LINQ, async, validation, nullable types, unsupported constructs, csproj to pom, EF conventions. Every expectation is also compiled. Regenerate with `-Dupdate.golden=true`, then read the diff |
+| Generated entities boot | Hibernate is started over the generated entities of every case and the sample, against H2, and creates the schema. Catches mappings that compile but fail at startup |
 | Rule tests | Each body rewrite rule, type mapping and attribute mapping, table-driven |
 | Verify loop | Rule failures demoted, AI failures repaired once then demoted, errors outside methods reported, all against the real compiler |
 | LLM layer | WireMock stubs: request shape, cache, malformed JSON, schema violations, refusal, 429 recovery, 5xx, token budget. The real API is never called in tests |
 | Integration | The whole application against PostgreSQL in Testcontainers: upload, pipeline, SSE, review, re-verify, download, AI job with caching |
 | Frontend | Vitest and Testing Library: filters, review actions, the strategy chart |
 
-`mvn verify` runs 278 Java tests and fails below 70% line coverage on `portway-core`
-(currently 88.7%, ANTLR-generated code excluded). `npm test --prefix web` runs 12 more.
+`mvn verify` runs 292 Java tests and fails below 70% line coverage on `portway-core`
+(ANTLR-generated code excluded). `npm test --prefix web` runs 12 more.
 
 ## Deploying
 

@@ -29,7 +29,7 @@ flowchart TB
 
 The core library knows nothing about Spring, HTTP, databases or any particular LLM. It defines two
 interfaces, `CompileVerifier` and `BodyTranslator`, and the application supplies implementations.
-That boundary is why the CLI works without a database and why the rule engine's 246 tests run in
+That boundary is why the CLI works without a database and why the rule engine's 249 tests run in
 seconds.
 
 ## Decisions
@@ -124,6 +124,10 @@ produce, and a second test compiles every expectation. On its first run that sec
 bugs the golden diff would have blessed: a `BadRequest(string)` inside a
 `ResponseEntity<List<T>>`, and an implicit `Ok()` wrapped around a ternary that already returned
 results.
+
+Compiling is still not the same as working. Running a generated project against Microsoft's
+TodoApi tutorial found an entity with no `@Id` (EF's key convention had not been carried over) that
+compiled and then failed at startup. A third check now boots Hibernate over every generated entity.
 
 ## Scaling
 

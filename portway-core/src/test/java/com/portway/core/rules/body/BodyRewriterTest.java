@@ -302,6 +302,18 @@ class BodyRewriterTest {
   }
 
   @Test
+  void exceptionFilterIsNamedAsTheReason() {
+    RewriteResult result =
+        rewriter.rewrite(
+            "{ try { Save(); } catch (DbUpdateConcurrencyException) when (!Exists(id)) { return NotFound(); } return NoContent(); }",
+            CONTROLLER,
+            false);
+
+    assertThat(result.tier()).isEqualTo(Tier.B);
+    assertThat(result.reason()).contains("exception filter");
+  }
+
+  @Test
   void switchExpressionGoesToTheModel() {
     RewriteResult result =
         rewriter.rewrite("{ return g switch { Genre.Fiction => 1, _ => 0 }; }", SERVICE, false);

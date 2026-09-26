@@ -378,6 +378,9 @@ public class BodyRewriter {
     SOFT_DENY.put(Pattern.compile("\\bas\\s+[A-Z]"), "uses an as-cast");
     SOFT_DENY.put(Pattern.compile("\\b(out|ref)\\s+\\w"), "passes an argument by reference");
     SOFT_DENY.put(Pattern.compile("\\bthrow\\s*;"), "rethrows with throw;");
+    SOFT_DENY.put(
+        Pattern.compile("\\bcatch\\s*\\([^)]*\\)\\s*when\\b"),
+        "uses an exception filter (catch ... when), which Java does not have");
     SOFT_DENY.put(Pattern.compile("\\bdelegate\\b"), "uses an anonymous delegate");
     SOFT_DENY.put(
         Pattern.compile("\\.(GroupBy|ThenBy|ThenByDescending|SelectMany|ToDictionary|Aggregate|Zip|ToArray|Last|LastOrDefault|Average|ToLookup|Join)\\s*\\("),
