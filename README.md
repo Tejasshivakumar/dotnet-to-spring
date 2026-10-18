@@ -1,5 +1,9 @@
 # Portway
 
+[![CI](https://github.com/Tejasshivakumar/dotnet-to-spring/actions/workflows/ci.yml/badge.svg)](https://github.com/Tejasshivakumar/dotnet-to-spring/actions/workflows/ci.yml)
+![Java 21](https://img.shields.io/badge/Java-21-informational)
+![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-informational)
+
 **A .NET to Spring Boot migration assistant.** It parses an ASP.NET Core service into a
 language-neutral model, applies deterministic mapping rules to produce a Spring Boot equivalent,
 uses an LLM only for the method bodies the rules cannot handle, and compiles every generated file
