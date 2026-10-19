@@ -157,9 +157,46 @@ mvn -B package -DskipTests
 java -jar portway-app/target/portway-app-0.1.0-SNAPSHOT.jar migrate sample-dotnet/BookstoreApi -o ./out
 ```
 
-For AI translation, set `ANTHROPIC_API_KEY` and add `--ai` (CLI) or `PORTWAY_AI_ENABLED=true`
-(server). The model is configurable with `PORTWAY_AI_MODEL`. Real Maven verification in Docker
-is `--verifier docker` (CLI) or `PORTWAY_VERIFY_MODE=docker` (server).
+For AI translation add `--ai` (CLI) or set `PORTWAY_AI_ENABLED=true` (server), and choose a
+provider below. Real Maven verification in Docker is `--verifier docker` (CLI) or
+`PORTWAY_VERIFY_MODE=docker` (server).
+
+### AI providers
+
+Anthropic is the default. Any provider that implements the OpenAI Chat Completions API also works,
+and several are free. Every response is validated against the same schema and compiled, whatever
+model wrote it. A weaker model means more methods end up stubbed for a human, not wrong code.
+
+| Provider | Cost | `PORTWAY_AI_PROVIDER` | Example `PORTWAY_AI_MODEL` | Key |
+|---|---|---|---|---|
+| Anthropic | paid | `anthropic` | `claude-opus-5` | `ANTHROPIC_API_KEY` |
+| Google Gemini | free tier | `gemini` | `gemini-2.5-flash` | `PORTWAY_AI_API_KEY`, from [AI Studio](https://aistudio.google.com/apikey) |
+| Groq | free tier | `groq` | `openai/gpt-oss-20b` | `PORTWAY_AI_API_KEY`, from [console.groq.com](https://console.groq.com/keys) |
+| OpenRouter | free models (`:free`) | `openrouter` | `qwen/qwen3-coder:free` | `PORTWAY_AI_API_KEY`, from [openrouter.ai](https://openrouter.ai/keys) |
+| Ollama | free, local | `ollama` | `qwen2.5-coder:7b` | none |
+| Anything else OpenAI-compatible | | `openai` plus `PORTWAY_AI_BASE_URL` | | `PORTWAY_AI_API_KEY` |
+
+Free-tier model names and limits change, so check the provider's model list. If a model rejects
+structured outputs, set `PORTWAY_AI_RESPONSE_FORMAT=json_object`. Cost estimates are zero for
+providers other than Anthropic unless `PORTWAY_AI_INPUT_USD_PER_MILLION` and
+`PORTWAY_AI_OUTPUT_USD_PER_MILLION` are set.
+
+```bash
+# CLI with Gemini's free tier
+PORTWAY_AI_PROVIDER=gemini PORTWAY_AI_MODEL=gemini-2.5-flash PORTWAY_AI_API_KEY=... \
+  java -jar portway-app/target/portway-app-0.1.0-SNAPSHOT.jar migrate sample-dotnet/BookstoreApi --ai -o ./out
+```
+
+With Docker, copy [`docker/.env.example`](docker/.env.example) to `docker/.env` and uncomment one
+block. To run without any account at all, start the bundled Ollama, which downloads the model on
+first start (about 4.7 GB for the 7B model; the 3B one is too weak for most methods):
+
+```bash
+cd docker && PORTWAY_AI_ENABLED=true PORTWAY_AI_PROVIDER=ollama PORTWAY_AI_MODEL=qwen2.5-coder:7b \
+  PORTWAY_AI_BASE_URL=http://ollama:11434/v1 docker compose --profile ollama up --build
+```
+
+If port 5432 or 8080 is taken, set `PORTWAY_DB_PORT` or `PORTWAY_PORT`.
 
 For development, start only the database (`docker compose -f docker/docker-compose.yml up db`),
 then `mvn install -DskipTests && mvn -pl portway-app spring-boot:run`, and `npm run dev --prefix
@@ -178,12 +215,17 @@ API documentation is served at `/swagger-ui.html`.
 | Generated entities boot | Hibernate is started over the generated entities of every case and the sample, against H2, and creates the schema. Catches mappings that compile but fail at startup |
 | Rule tests | Each body rewrite rule, type mapping and attribute mapping, table-driven |
 | Verify loop | Rule failures demoted, AI failures repaired once then demoted, errors outside methods reported, all against the real compiler |
-| LLM layer | WireMock stubs: request shape, cache, malformed JSON, schema violations, refusal, 429 recovery, 5xx, token budget. The real API is never called in tests |
+| LLM layer | WireMock stubs for both the Anthropic and the OpenAI-compatible clients: request shape, cache, malformed JSON, schema violations, refusal, truncation, 429 recovery, 5xx, token budget. No real provider is called in tests |
 | Integration | The whole application against PostgreSQL in Testcontainers: upload, pipeline, SSE, review, re-verify, download, AI job with caching |
 | Frontend | Vitest and Testing Library: filters, review actions, the strategy chart |
 
-`mvn verify` runs 292 Java tests and fails below 70% line coverage on `portway-core`
+`mvn verify` runs 301 Java tests and fails below 70% line coverage on `portway-core`
 (ANTLR-generated code excluded). `npm test --prefix web` runs 12 more.
+
+[`scripts/smoke-test.sh`](scripts/smoke-test.sh) checks a running server end to end through its
+API: the sample and an uploaded zip, SSE progress, zip-slip and oversized-entry rejection, review
+and edit, re-verify, report, download, and deletion. `AI=true` also checks that the model's
+translation compiled, and `BUILD=true` builds the downloaded project with Maven.
 
 ## Deploying
 

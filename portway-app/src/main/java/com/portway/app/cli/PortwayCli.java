@@ -45,7 +45,8 @@ public final class PortwayCli {
         --verifier <in-process|docker|none>
                                     how to compile-check the output (default: in-process)
         --ai                        translate methods the rules cannot, using the LLM configured
-                                    by ANTHROPIC_API_KEY (and PORTWAY_AI_MODEL)
+                                    by ANTHROPIC_API_KEY (and PORTWAY_AI_MODEL), or by
+                                    PORTWAY_AI_PROVIDER, PORTWAY_AI_MODEL and PORTWAY_AI_API_KEY
       """;
 
   private final PrintStream out;
@@ -86,7 +87,13 @@ public final class PortwayCli {
                   Path.of(System.getProperty("user.home"), ".portway", "m2"), Duration.ofSeconds(180), 1024L * 1024 * 1024);
           default -> new InProcessCompileVerifier(VerifyClasspath.resolve());
         };
-    BodyTranslator translator = a.ai ? translatorFactory.get() : null;
+    BodyTranslator translator;
+    try {
+      translator = a.ai ? translatorFactory.get() : null;
+    } catch (IllegalStateException e) {
+      err.println("AI is not configured: " + e.getMessage());
+      return 1;
+    }
 
     Path work = tempDir();
     VerifiedMigration.Outcome outcome;

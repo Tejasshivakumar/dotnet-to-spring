@@ -32,7 +32,7 @@ public class AiTranslatorFactory {
         prompts,
         schema,
         concurrency,
-        new UsageMeter(properties.jobTokenBudget(), properties.inputUsdPerMillion(), properties.outputUsdPerMillion()));
+        new UsageMeter(properties.jobTokenBudget(), properties.inputPrice(), properties.outputPrice()));
   }
 
   /** For the CLI: settings from the environment, a cache that lasts one run. */
@@ -40,6 +40,13 @@ public class AiTranslatorFactory {
     AiProperties properties = AiProperties.fromEnvironment();
     TranslationSchema schema = new TranslationSchema();
     return new AiTranslatorFactory(
-        properties, new AnthropicLlmClient(properties, schema.apiSchema()), AiCache.inMemory(), schema);
+        properties, client(properties, schema), AiCache.inMemory(), schema);
+  }
+
+  /** The client for the configured provider: Anthropic's SDK, or any OpenAI-compatible endpoint. */
+  public static LlmClient client(AiProperties properties, TranslationSchema schema) {
+    return properties.isAnthropic()
+        ? new AnthropicLlmClient(properties, schema.apiSchema())
+        : new OpenAiCompatibleLlmClient(properties, schema.apiSchema());
   }
 }
