@@ -13,7 +13,7 @@ services:
       POSTGRES_USER: portway
       POSTGRES_PASSWORD: portway
     ports:
-      - "5432:5432"
+      - "${PORTWAY_DB_PORT:-5432}:5432"
     volumes:
       - portway-db:/var/lib/postgresql/data
     healthcheck:
@@ -33,11 +33,39 @@ services:
       PORTWAY_DB_URL: jdbc:postgresql://db:5432/portway
       PORTWAY_DB_USER: portway
       PORTWAY_DB_PASSWORD: portway
-      # Set to enable AI translation of methods the rules cannot handle.
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # AI translation of methods the rules cannot handle. Copy docker/.env.example
+      # to docker/.env and pick a provider; see the README, "AI providers".
       PORTWAY_AI_ENABLED: ${PORTWAY_AI_ENABLED:-false}
+      PORTWAY_AI_PROVIDER: ${PORTWAY_AI_PROVIDER:-anthropic}
+      PORTWAY_AI_MODEL: ${PORTWAY_AI_MODEL:-claude-opus-5}
+      PORTWAY_AI_BASE_URL: ${PORTWAY_AI_BASE_URL:-}
+      PORTWAY_AI_RESPONSE_FORMAT: ${PORTWAY_AI_RESPONSE_FORMAT:-json_schema}
+      PORTWAY_AI_API_KEY: ${PORTWAY_AI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     ports:
-      - "8080:8080"
+      - "${PORTWAY_PORT:-8080}:8080"
+
+  # A free local model, no account or key. Started only with --profile ollama:
+  #   docker compose -f docker/docker-compose.yml --profile ollama up --build
+  # and PORTWAY_AI_PROVIDER=ollama, PORTWAY_AI_BASE_URL=http://ollama:11434/v1.
+  ollama:
+    image: ollama/ollama:0.12.3
+    profiles: [ollama]
+    ports:
+      - "11434:11434"
+    volumes:
+      - portway-ollama:/root/.ollama
+
+  # Downloads the model once into the shared volume, then exits.
+  ollama-pull:
+    image: ollama/ollama:0.12.3
+    profiles: [ollama]
+    depends_on: [ollama]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c", "sleep 3 && ollama pull ${PORTWAY_AI_MODEL:-qwen2.5-coder:7b}"]
 
 volumes:
   portway-db:
+  portway-ollama:
+    name: portway-ollama   # models are large; keep them across `down`

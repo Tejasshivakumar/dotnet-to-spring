@@ -61,6 +61,15 @@ public class DockerCompileVerifier implements CompileVerifier {
   public CompileResult verify(Path projectDir) {
     long started = System.nanoTime();
     try {
+      VerificationPom.validate(projectDir.resolve("pom.xml"));
+      if (Files.exists(projectDir.resolve(".mvn"))) {
+        throw new IllegalArgumentException("Custom .mvn configuration is not supported by Docker verification");
+      }
+    } catch (IllegalArgumentException e) {
+      return new CompileResult(false, List.of(new CompileError(null, 0, 0, e.getMessage())),
+          e.getMessage(), Duration.ofNanos(System.nanoTime() - started), name());
+    }
+    try {
       Files.createDirectories(mavenCache);
       warmUp(projectDir);
     } catch (IOException e) {
@@ -101,8 +110,9 @@ public class DockerCompileVerifier implements CompileVerifier {
     try (GenericContainer<?> maven = new GenericContainer<>(MAVEN)) {
       maven
           .withLogConsumer(frame -> log.append(frame.getUtf8String()))
-          .withCopyToContainer(MountableFile.forHostPath(projectDir), WORKSPACE)
-          .withFileSystemBind(mavenCache.toString(), "/root/.m2", BindMode.READ_WRITE)
+          .withCopyToContainer(MountableFile.forHostPath(network ? projectDir.resolve("pom.xml") : projectDir),
+              network ? WORKSPACE + "/pom.xml" : WORKSPACE)
+          .withFileSystemBind(mavenCache.toString(), "/root/.m2", network ? BindMode.READ_WRITE : BindMode.READ_ONLY)
           .withWorkingDirectory(WORKSPACE)
           .withCommand(command.toArray(String[]::new))
           .withStartupCheckStrategy(new OneShotStartupCheckStrategy().withTimeout(timeout))

@@ -3,6 +3,7 @@ package com.portway.app.api;
 import com.portway.app.domain.CompileStatus;
 import com.portway.app.domain.FindingEntity;
 import com.portway.app.domain.GeneratedFileEntity;
+import com.portway.app.domain.JobStatus;
 import com.portway.app.domain.MigrationJob;
 import com.portway.app.pipeline.JobEvent;
 import com.portway.app.pipeline.JobEvents;
@@ -19,6 +20,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -70,15 +73,34 @@ public class ReverifyService {
 
   /** Queues a verification of the current files. Fails fast if the job is not complete. */
   public void submit(UUID jobId) {
-    Map<String, String> current = jobService.currentFiles(jobId);
-    executor.execute(() -> {
-      try {
-        run(jobId, current);
-      } catch (RuntimeException e) {
-        log.error("Re-verification of job {} failed", jobId, e);
-        events.publish(JobEvent.of(jobId, "verify-failed", "VERIFY", null, e.getMessage()));
-      }
+    Map<String, String> current = transaction.execute(status -> {
+      MigrationJob job = jobs.findForUpdate(jobId).orElseThrow(() -> new JobNotFoundException(jobId));
+      Map<String, String> snapshot = jobService.currentFiles(jobId);
+      job.setStatus(JobStatus.RUNNING);
+      job.setCurrentStage("VERIFY");
+      job.setCompileStatus(CompileStatus.NOT_RUN);
+      files.findByJobIdOrderByPositionAsc(jobId).forEach(f -> f.setCompileStatus(CompileStatus.NOT_RUN));
+      return snapshot;
     });
+    // Commit RUNNING before dispatch: concurrent reviews, deletes and verifies must wait.
+    try {
+      executor.execute(() -> {
+        try {
+          run(jobId, current);
+        } catch (RuntimeException e) {
+          log.error("Re-verification of job {} failed", jobId, e);
+          CompileResult failed = new CompileResult(false,
+              List.of(new CompileError(null, 0, 0, "Verification failed: " + e.getMessage())),
+              "", Duration.ZERO, verifier.name());
+          transaction.executeWithoutResult(status -> record(jobId, current, failed));
+          events.publish(JobEvent.of(jobId, "completed", "VERIFY", "FAIL", e.getMessage()));
+        }
+      });
+    } catch (RuntimeException e) {
+      transaction.executeWithoutResult(status -> jobs.findForUpdate(jobId)
+          .ifPresent(job -> job.setStatus(JobStatus.COMPLETED)));
+      throw e;
+    }
   }
 
   void run(UUID jobId, Map<String, String> current) {
@@ -96,12 +118,13 @@ public class ReverifyService {
       JobService.deleteQuietly(dir);
     }
     transaction.executeWithoutResult(status -> record(jobId, current, result));
-    events.publish(JobEvent.of(jobId, "verified", "VERIFY", result.success() ? "PASS" : "FAIL",
+    events.publish(JobEvent.of(jobId, "completed", "VERIFY", result.success() ? "PASS" : "FAIL",
         result.errors().size() + " errors"));
   }
 
   private void record(UUID jobId, Map<String, String> current, CompileResult result) {
-    MigrationJob job = jobs.findById(jobId).orElseThrow(() -> new JobNotFoundException(jobId));
+    MigrationJob job = jobs.findForUpdate(jobId).orElseThrow(() -> new JobNotFoundException(jobId));
+    job.setStatus(JobStatus.COMPLETED);
     job.setCompileStatus(result.success() ? CompileStatus.PASS : CompileStatus.FAIL);
     job.setVerifier(result.verifier());
 
@@ -115,7 +138,10 @@ public class ReverifyService {
       if (!current.containsKey(file.getPath())) {
         file.setCompileStatus(CompileStatus.NOT_RUN);
       } else {
-        file.setCompileStatus(result.errorsIn(file.getPath()).isEmpty() ? CompileStatus.PASS : CompileStatus.FAIL);
+        boolean globalError = !result.success()
+            && (result.errors().isEmpty() || result.errors().stream().anyMatch(e -> e.path() == null));
+        file.setCompileStatus(globalError ? CompileStatus.NOT_RUN
+            : result.errorsIn(file.getPath()).isEmpty() ? CompileStatus.PASS : CompileStatus.FAIL);
       }
     }
     for (CompileError error : result.errors()) {

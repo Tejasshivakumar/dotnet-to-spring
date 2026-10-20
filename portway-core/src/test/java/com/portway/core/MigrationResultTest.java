@@ -12,6 +12,19 @@ import org.junit.jupiter.api.Test;
 
 class MigrationResultTest {
 
+  @Test
+  void reportsEnumContractChangesInTheReviewAndDownload(@org.junit.jupiter.api.io.TempDir java.nio.file.Path source)
+      throws Exception {
+    java.nio.file.Files.writeString(source.resolve("Status.cs"),
+        "namespace Example; public enum Status { New = 3, Done = 9 }");
+    MigrationResult result = new DefaultMigrator().migrate(source);
+    assertThat(result.findings()).anySatisfy(f -> {
+      assertThat(f.code()).isEqualTo(FindingCode.ENUM_REPRESENTATION);
+      assertThat(f.message()).contains("numeric values are not preserved", "JSON");
+    });
+    assertThat(result.files().get("MIGRATION-NOTES.md")).contains("ENUM_REPRESENTATION");
+  }
+
   /**
    * Generation runs in dependency order and the review UI lists files in that order. An immutable
    * map built with Map.copyOf hashes its keys and loses it.

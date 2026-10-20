@@ -29,7 +29,7 @@ flowchart TB
 
 The core library knows nothing about Spring, HTTP, databases or any particular LLM. It defines two
 interfaces, `CompileVerifier` and `BodyTranslator`, and the application supplies implementations.
-That boundary is why the CLI works without a database and why the rule engine's 249 tests run in
+That boundary is why the CLI works without a database and why the core's 250 tests run in
 seconds.
 
 ## Decisions
@@ -86,6 +86,15 @@ real compiler. It runs with no network, capped memory and CPU, a timeout, and on
 project, because generated code is untrusted input. An offline build needs a warm repository, so a
 separate networked container resolves each distinct pom's dependencies first. That container
 downloads artifacts and never compiles generated code.
+
+Before warm-up, the POM must retain the generated Spring Boot parent and build configuration.
+Custom executable build configuration is rejected with a compile finding. Only the POM is copied
+to the networked resolver; offline compilation sees a read-only dependency cache.
+
+Review edits and rejected-file changes invalidate the entire project's compile status. A
+re-verification marks the job RUNNING before dispatch, under a database lock shared with review
+and deletion. Those operations and duplicate verification requests receive a conflict until the
+build finishes. Compiler infrastructure failures are persisted and leave the job retryable.
 
 Azure Container Apps has no Docker socket, so the cloud deployment compiles in-process with javac
 against a fixed classpath of the APIs generated code may import. It is fast and weaker: it cannot

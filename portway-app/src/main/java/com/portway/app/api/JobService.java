@@ -155,8 +155,14 @@ public class JobService {
   public JobSummary createFromSample(JobOptions options) {
     MigrationJob job = jobs.save(new MigrationJob(SampleProject.NAME, options.toMap()));
     Path workDir = workDir(job.getId());
-    Path root = sample.copyTo(workDir.resolve("source"));
-    return start(job, workDir, root, options);
+    try {
+      Path root = sample.copyTo(workDir.resolve("source"));
+      return start(job, workDir, root, options);
+    } catch (RuntimeException e) {
+      jobs.delete(job);
+      deleteQuietly(workDir);
+      throw e;
+    }
   }
 
   private JobSummary start(MigrationJob job, Path workDir, Path sourceRoot, JobOptions options) {
@@ -171,20 +177,28 @@ public class JobService {
 
   @Transactional
   public FileSummary review(UUID jobId, UUID fileId, ReviewRequest request) {
+    MigrationJob job = jobs.findForUpdate(jobId).orElseThrow(() -> new JobNotFoundException(jobId));
     requireState(jobId, JobStatus.COMPLETED, "reviewed");
     GeneratedFileEntity file = file(jobId, fileId);
+    boolean membershipChanged = (file.getReviewStatus() == ReviewStatus.REJECTED)
+        != (request.status() == ReviewStatus.REJECTED);
     file.setReviewStatus(request.status());
-    if (request.editedContent() != null && !request.editedContent().equals(file.getContent())) {
+    boolean edited = request.editedContent() != null && !request.editedContent().equals(file.getContent());
+    if (edited) {
       file.setContent(request.editedContent());
-      // An edit has not been compiled. Say so until someone re-runs verification.
-      file.setCompileStatus(CompileStatus.NOT_RUN);
+    }
+    if (edited || membershipChanged) {
+      // Dependencies and the pom may have changed; every previous result is stale.
+      job.setCompileStatus(CompileStatus.NOT_RUN);
+      files.findByJobIdOrderByPositionAsc(jobId).forEach(f -> f.setCompileStatus(CompileStatus.NOT_RUN));
+      findings.deleteByJobIdAndCode(jobId, "COMPILE_ERROR");
     }
     return fileSummary(file, findings.findByGeneratedFileId(fileId), sourcePathOf(file));
   }
 
   @Transactional
   public void delete(UUID jobId) {
-    MigrationJob job = job(jobId);
+    MigrationJob job = jobs.findForUpdate(jobId).orElseThrow(() -> new JobNotFoundException(jobId));
     if (job.getStatus() == JobStatus.RUNNING || job.getStatus() == JobStatus.PENDING) {
       throw new JobStateException("Job " + jobId + " is still running and cannot be deleted yet");
     }

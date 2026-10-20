@@ -77,17 +77,21 @@ public class ZipIngest {
         if (!destination.startsWith(base) || name.startsWith("/") || name.contains(":")) {
           throw new UploadRejectedException("Archive entry escapes the upload directory: " + entry.getName());
         }
-        if (entry.isDirectory() || !wanted(name)) {
-          continue;
+        boolean keep = !entry.isDirectory() && wanted(name);
+        if (keep) {
+          Files.createDirectories(destination.getParent());
         }
-        Files.createDirectories(destination.getParent());
-        long size = copyBounded(in, destination, limits.maxEntryBytes(), name);
+        // getNextEntry() drains skipped entries too. Bound that inflation explicitly.
+        long size;
+        try (OutputStream out = keep ? Files.newOutputStream(destination) : OutputStream.nullOutputStream()) {
+          size = copyBounded(in, out, limits.maxEntryBytes(), name);
+        }
         total += size;
         if (total > limits.maxTotalBytes()) {
           throw new UploadRejectedException(
               "Archive inflates to more than " + limits.maxTotalBytes() / (1024 * 1024) + " MB");
         }
-        written++;
+        if (keep) written++;
       }
     } catch (ZipException e) {
       throw new UploadRejectedException("Not a valid zip archive: " + e.getMessage());
@@ -112,19 +116,17 @@ public class ZipIngest {
         || (file.startsWith("appsettings") && file.endsWith(".json"));
   }
 
-  private static long copyBounded(InputStream in, Path destination, long max, String name) throws IOException {
+  private static long copyBounded(InputStream in, OutputStream out, long max, String name) throws IOException {
     long size = 0;
     byte[] buffer = new byte[8192];
-    try (OutputStream out = Files.newOutputStream(destination)) {
-      int read;
-      while ((read = in.read(buffer)) != -1) {
-        size += read;
-        if (size > max) {
-          throw new UploadRejectedException(
-              name + " inflates to more than " + max / (1024 * 1024) + " MB");
-        }
-        out.write(buffer, 0, read);
+    int read;
+    while ((read = in.read(buffer)) != -1) {
+      size += read;
+      if (size > max) {
+        throw new UploadRejectedException(
+            name + " inflates to more than " + max / (1024 * 1024) + " MB");
       }
+      out.write(buffer, 0, read);
     }
     return size;
   }

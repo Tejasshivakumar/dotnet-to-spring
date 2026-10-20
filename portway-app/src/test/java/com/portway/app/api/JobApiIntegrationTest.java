@@ -116,6 +116,8 @@ class JobApiIntegrationTest {
         "{\"status\":\"ACCEPTED\",\"editedContent\":\"package bookstoreapi.domain; public enum Genre { BROKEN BROKEN }\"}");
     assertThat(reviewed.get("compileStatus").asText()).isEqualTo("NOT_RUN");
     assertThat(reviewed.get("edited").asBoolean()).isTrue();
+    assertThat(http.getForObject("/api/jobs/" + id, JsonNode.class)
+        .at("/job/compileStatus").asText()).isEqualTo("NOT_RUN");
 
     assertThat(http.postForEntity("/api/jobs/" + id + "/verify", null, Void.class).getStatusCode())
         .isEqualTo(HttpStatus.ACCEPTED);
@@ -127,6 +129,8 @@ class JobApiIntegrationTest {
 
     // Rejecting the broken file leaves it out of both verification and the download.
     post("/api/jobs/" + id + "/files/" + entity + "/review", "{\"status\":\"REJECTED\"}");
+    assertThat(http.getForObject("/api/jobs/" + id, JsonNode.class)
+        .at("/job/compileStatus").asText()).isEqualTo("NOT_RUN");
     Set<String> entries = downloadEntries(id);
     assertThat(entries).contains("pom.xml", "src/main/java/bookstoreapi/service/BookServiceImpl.java")
         .doesNotContain("src/main/java/bookstoreapi/domain/Genre.java");
@@ -262,6 +266,12 @@ class JobApiIntegrationTest {
     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
     try (ZipOutputStream zip = new ZipOutputStream(bytes); Stream<Path> walk = Files.walk(root)) {
       for (Path file : walk.filter(Files::isRegularFile).toList()) {
+        // Package sources, as the upload UI requests; local dotnet build output can be huge.
+        Path relative = root.relativize(file);
+        if (Stream.iterate(relative, p -> p != null, Path::getParent)
+            .anyMatch(p -> p.getFileName().toString().equals("bin") || p.getFileName().toString().equals("obj"))) {
+          continue;
+        }
         zip.putNextEntry(new ZipEntry("BookstoreApi/" + root.relativize(file).toString().replace('\\', '/')));
         zip.write(Files.readAllBytes(file));
         zip.closeEntry();

@@ -66,7 +66,8 @@ class LlmBodyTranslatorTest {
 
   private LlmBodyTranslator translator(long budget) {
     AiProperties properties =
-        new AiProperties(true, "claude-opus-5", "high", 16000, 3, 3, budget, 5.0, 25.0, api.baseUrl());
+        new AiProperties(
+            true, "anthropic", "claude-opus-5", "high", 16000, 3, 3, budget, 5.0, 25.0, api.baseUrl(), "json_schema");
     TranslationSchema schema = new TranslationSchema();
     return new LlmBodyTranslator(
         new AnthropicLlmClient(properties, schema.apiSchema(), "test-key"),

@@ -34,6 +34,8 @@ export function useReview(jobId: string) {
       client.invalidateQueries({ queryKey: keys.files(jobId) })
       client.invalidateQueries({ queryKey: keys.file(jobId, v.fileId) })
       client.invalidateQueries({ queryKey: keys.report(jobId) })
+      client.invalidateQueries({ queryKey: keys.job(jobId) })
+      client.invalidateQueries({ queryKey: keys.jobs })
     },
   })
 }
@@ -41,16 +43,22 @@ export function useReview(jobId: string) {
 export function useVerify(jobId: string) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: () => api.verify(jobId),
-    onSuccess: () => {
-      // Verification runs in the background; poll a few times for its result.
-      for (const delay of [1500, 4000, 9000, 20000]) {
-        setTimeout(() => {
-          client.invalidateQueries({ queryKey: keys.files(jobId) })
-          client.invalidateQueries({ queryKey: keys.job(jobId) })
-          client.invalidateQueries({ queryKey: ['file', jobId] })
-        }, delay)
+    mutationFn: async () => {
+      await api.verify(jobId)
+      // Keep the action pending for the entire build, including slow Docker builds.
+      while (true) {
+        const detail = await api.job(jobId)
+        client.setQueryData(keys.job(jobId), detail)
+        if (detail.job.status !== 'RUNNING' && detail.job.status !== 'PENDING') break
+        await new Promise(resolve => setTimeout(resolve, 1000))
       }
+    },
+    onSettled: () => {
+      client.invalidateQueries({ queryKey: keys.files(jobId) })
+      client.invalidateQueries({ queryKey: keys.job(jobId) })
+      client.invalidateQueries({ queryKey: ['file', jobId] })
+      client.invalidateQueries({ queryKey: keys.report(jobId) })
+      client.invalidateQueries({ queryKey: keys.jobs })
     },
   })
 }

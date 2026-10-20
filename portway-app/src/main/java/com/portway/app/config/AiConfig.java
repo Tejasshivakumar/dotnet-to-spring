@@ -2,7 +2,6 @@ package com.portway.app.config;
 
 import com.portway.app.ai.AiProperties;
 import com.portway.app.ai.AiTranslatorFactory;
-import com.portway.app.ai.AnthropicLlmClient;
 import com.portway.app.ai.JpaAiCache;
 import com.portway.app.ai.TranslationSchema;
 import com.portway.app.repo.AiCacheRepository;
@@ -24,6 +23,6 @@ public class AiConfig {
   AiTranslatorFactory aiTranslatorFactory(AiProperties properties, AiCacheRepository cache) {
     TranslationSchema schema = new TranslationSchema();
     return new AiTranslatorFactory(
-        properties, new AnthropicLlmClient(properties, schema.apiSchema()), new JpaAiCache(cache), schema);
+        properties, AiTranslatorFactory.client(properties, schema), new JpaAiCache(cache), schema);
   }
 }

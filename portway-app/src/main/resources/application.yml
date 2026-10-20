@@ -44,9 +44,14 @@ portway:
       timeout: 180s
       memory-bytes: 1073741824
   ai:
-    # Needs ANTHROPIC_API_KEY in the environment. Never put the key in this file.
+    # Keys come from the environment, never this file: ANTHROPIC_API_KEY for
+    # anthropic, PORTWAY_AI_API_KEY for the OpenAI-compatible providers (gemini,
+    # groq, openrouter, or openai with a base-url). ollama needs no key.
     enabled: ${PORTWAY_AI_ENABLED:false}
+    provider: ${PORTWAY_AI_PROVIDER:anthropic}
     model: ${PORTWAY_AI_MODEL:claude-opus-5}
+    base-url: ${PORTWAY_AI_BASE_URL:}
+    response-format: ${PORTWAY_AI_RESPONSE_FORMAT:json_schema}
     effort: ${PORTWAY_AI_EFFORT:high}
     max-concurrent: 3
     max-retries: 3
