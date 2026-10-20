@@ -65,7 +65,7 @@ if [ "$AI" = "true" ]; then
   AI_DONE=$(jq '[.job.methodsByStrategy | to_entries[] | select(.key | startswith("AI_")) | .value] | add // 0' <<<"$DETAIL")
   echo "    AI usage: $(jq -c '.stats.ai // .stats' <<<"$DETAIL")"
   if [ "$AI_DONE" -gt 0 ]; then pass "$AI_DONE method(s) translated by the model and compiled"
-  else warn "the model's translation did not survive compilation; the method was stubbed (try a stronger model)"; fi
+  else fail "AI was requested but no model translation survived compilation"; fi
 fi
 
 echo "Upload"

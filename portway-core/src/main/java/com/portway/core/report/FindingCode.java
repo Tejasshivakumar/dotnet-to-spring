@@ -39,6 +39,8 @@ public enum FindingCode {
   CONFIG_KEY(Severity.INFO),
   /** An entity association is kept out of JSON, which changes the shape of any API returning it. */
   LAZY_ASSOCIATION(Severity.MEDIUM),
+  /** Java enum names replace C# numeric values; persistence and JSON contracts need review. */
+  ENUM_REPRESENTATION(Severity.MEDIUM),
   /** A NuGet package mapped to a Maven dependency with caveats worth reading. */
   PACKAGE_MAPPING(Severity.MEDIUM),
   /** Generated code did not compile; see the message for the compiler's error. */

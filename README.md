@@ -50,8 +50,10 @@ Without AI:
 With AI enabled, the decimal method is the only one the model is asked to translate. The
 `yield return` method is never sent to it.
 
-The generated application also runs: against PostgreSQL it serves every migrated endpoint,
-including validation errors, 404s and the `Location` header on create.
+The generated application also runs: against PostgreSQL its translated CRUD endpoints work,
+including validation errors, 404s and the `Location` header on create. Without AI or a manual fix,
+`GET /api/books/value` reaches the documented decimal stub and returns 500. A compile PASS does
+not mean every method is implemented or that the original API contract is preserved.
 
 ### On code it was not written against
 
@@ -109,6 +111,7 @@ Every one of these is reported, with what happened instead. None of them is sile
 | EF fluent configuration in `OnModelCreating` | Not translated; copied verbatim into `MIGRATION-NOTES.md` with a HIGH finding |
 | `Program.cs` middleware | Not translated line by line; DI registrations and `Configure<T>` bindings are read from it |
 | `async` semantics | Dropped: the Java is synchronous, and every affected method gets an `ASYNC_DROPPED` finding |
+| Enum numeric values and JSON representation | Java enum names replace C# numeric values; `ENUM_REPRESENTATION` flags existing data, flags enums and serializer contracts for review |
 | Unknown NuGet packages | Nothing added to the pom; an `UNKNOWN_PACKAGE` finding names each one |
 | `#if` blocks | Evaluated with no symbols defined, as a Release build would be |
 
@@ -219,13 +222,22 @@ API documentation is served at `/swagger-ui.html`.
 | Integration | The whole application against PostgreSQL in Testcontainers: upload, pipeline, SSE, review, re-verify, download, AI job with caching |
 | Frontend | Vitest and Testing Library: filters, review actions, the strategy chart |
 
-`mvn verify` runs 301 Java tests and fails below 70% line coverage on `portway-core`
-(ANTLR-generated code excluded). `npm test --prefix web` runs 12 more.
+`mvn verify` runs 311 Java tests and fails below 70% line coverage on `portway-core`
+(ANTLR-generated code excluded). Docker is needed to run all integration tests without skips.
+`npm test --prefix web` runs 13 more. See [the verification report](VERIFICATION-REPORT.md)
+for the latest local evidence and remaining limits.
 
 [`scripts/smoke-test.sh`](scripts/smoke-test.sh) checks a running server end to end through its
 API: the sample and an uploaded zip, SSE progress, zip-slip and oversized-entry rejection, review
 and edit, re-verify, report, download, and deletion. `AI=true` also checks that the model's
 translation compiled, and `BUILD=true` builds the downloaded project with Maven.
+
+Uploads are limited to 20 MB compressed, 2,000 entries, 5 MB per inflated entry and 100 MB total
+inflated data, including ignored files. Exclude `bin/`, `obj/` and other build output when zipping.
+Docker verification accepts the generated Spring Boot parent and build configuration; custom
+parents, plugins, profiles, modules, repositories and `.mvn` configuration require a separate
+trusted build. Dependency warm-up receives only the POM, and offline compilation mounts its Maven
+cache read-only.
 
 ## Deploying
 

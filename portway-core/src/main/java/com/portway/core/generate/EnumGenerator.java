@@ -5,6 +5,8 @@ import com.palantir.javapoet.TypeSpec;
 import com.portway.core.ir.FieldDecl;
 import com.portway.core.ir.SourceFile;
 import com.portway.core.ir.TypeDecl;
+import com.portway.core.report.Finding;
+import com.portway.core.report.FindingCode;
 import java.util.List;
 import javax.lang.model.element.Modifier;
 
@@ -17,7 +19,7 @@ import javax.lang.model.element.Modifier;
  *
  * <p>Explicit numeric values are dropped. C# enums are integers with names; Java enums are objects
  * with an ordinal. Persisting them as strings, which is what the entity generator emits, makes the
- * numeric value irrelevant and the stored data readable.
+ * stored data readable, but requires explicit review of existing data and JSON contracts.
  */
 public class EnumGenerator {
 
@@ -48,6 +50,11 @@ public class EnumGenerator {
     String path =
         "src/main/java/" + packageName.replace('.', '/') + "/" + enumType.name() + ".java";
     return new GeneratedFile(
-        path, formatter.format(javaFile.toString()), source.path(), List.of());
+        path, formatter.format(javaFile.toString()), source.path(),
+        List.of(Finding.at(FindingCode.ENUM_REPRESENTATION,
+            "Enum " + enumType.name() + ": C# numeric values are not preserved. Java uses enum names "
+                + "for JSON and JPA persistence by default. Review numeric/flags values, existing database "
+                + "data and JSON serializer settings before using this API as a replacement.",
+            source.path(), 0)));
   }
 }

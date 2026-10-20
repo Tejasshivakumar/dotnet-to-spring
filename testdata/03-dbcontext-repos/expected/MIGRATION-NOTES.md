@@ -22,6 +22,10 @@ None.
 
 - BookstoreDbContext.OnModelCreating contains fluent configuration that was not translated. It is copied into MIGRATION-NOTES.md; review it against the generated entities. `BookstoreDbContext.cs:16`
 
+### ENUM_REPRESENTATION (MEDIUM, 1)
+
+- Enum Genre: C# numeric values are not preserved. Java uses enum names for JSON and JPA persistence by default. Review numeric/flags values, existing database data and JSON serializer settings before using this API as a replacement. `Genre.cs`
+
 ### LAZY_ASSOCIATION (MEDIUM, 2)
 
 - Author.Books is a lazy JPA association and is left out of JSON (@JsonIgnore). EF serialised whatever was loaded; if API clients read this field, return a DTO that includes it. `Author.cs`

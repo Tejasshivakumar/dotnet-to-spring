@@ -76,6 +76,23 @@ class ZipIngestTest {
   }
 
   @Test
+  void boundsIgnoredEntriesToo(@TempDir Path target) throws IOException {
+    for (String name : java.util.List.of("README.txt", "bin/Debug/Api.dll", "directory/")) {
+      byte[] archive = zip(Map.of(name, "0".repeat(500), "Api.cs", "class Api {}"));
+      assertThatThrownBy(() -> ingest.extract(new ByteArrayInputStream(archive), target))
+          .isInstanceOf(UploadRejectedException.class).hasMessageContaining(name);
+    }
+  }
+
+  @Test
+  void countsIgnoredEntriesTowardsTotalLimit(@TempDir Path target) throws IOException {
+    byte[] archive = zip(Map.of("a.txt", "0".repeat(300), "b.txt", "0".repeat(300),
+        "c.txt", "0".repeat(300), "Api.cs", "x".repeat(300)));
+    assertThatThrownBy(() -> ingest.extract(new ByteArrayInputStream(archive), target))
+        .isInstanceOf(UploadRejectedException.class).hasMessageContaining("inflates to more than");
+  }
+
+  @Test
   void capsTheTotalAcrossEntries(@TempDir Path target) throws IOException {
     Map<String, String> files = new java.util.LinkedHashMap<>();
     for (int i = 0; i < 4; i++) {

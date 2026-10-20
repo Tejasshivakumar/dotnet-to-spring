@@ -31,3 +31,6 @@ obj/
 # .NET build output from the sample fixture
 sample-dotnet/**/bin/
 sample-dotnet/**/obj/
+
+# Local zips of the sample
+sample-dotnet/*.zip
